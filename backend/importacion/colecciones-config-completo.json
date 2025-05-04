@@ -1,0 +1,912 @@
+{
+  "collections": [
+    {
+      "name": "proveedores",
+      "type": "base",
+      "system": false,
+      "schema": [
+        {
+          "name": "nombre",
+          "type": "text",
+          "system": false,
+          "required": true
+        },
+        {
+          "name": "contacto",
+          "type": "text",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "activo",
+          "type": "bool",
+          "system": false,
+          "required": false,
+          "default": true
+        },
+        {
+          "name": "fecha_alta",
+          "type": "date",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "nif",
+          "type": "text",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "direccion",
+          "type": "text",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "email",
+          "type": "email",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "telefono",
+          "type": "text",
+          "system": false,
+          "required": false
+        }
+      ],
+      "listRule": "",
+      "viewRule": "",
+      "createRule": "",
+      "updateRule": "",
+      "deleteRule": ""
+    },
+    {
+      "name": "categorias",
+      "type": "base",
+      "system": false,
+      "schema": [
+        {
+          "name": "nombre",
+          "type": "text",
+          "system": false,
+          "required": true
+        },
+        {
+          "name": "descripcion",
+          "type": "text",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "activo",
+          "type": "bool",
+          "system": false,
+          "required": false,
+          "default": true
+        },
+        {
+          "name": "fecha_alta",
+          "type": "date",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "visible_online",
+          "type": "bool",
+          "system": false,
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "orden",
+          "type": "number",
+          "system": false,
+          "required": false
+        }
+      ],
+      "listRule": "",
+      "viewRule": "",
+      "createRule": "",
+      "updateRule": "",
+      "deleteRule": ""
+    },
+    {
+      "name": "productos",
+      "type": "base",
+      "system": false,
+      "schema": [
+        {
+          "name": "codigo",
+          "type": "text",
+          "system": false,
+          "required": true
+        },
+        {
+          "name": "codigo_barras",
+          "type": "text",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "codigo_barras_tipo",
+          "type": "text",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "nombre",
+          "type": "text",
+          "system": false,
+          "required": true
+        },
+        {
+          "name": "descripcion_larga",
+          "type": "text",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "precio_compra",
+          "type": "number",
+          "system": false,
+          "required": false,
+          "default": 0
+        },
+        {
+          "name": "precio_venta",
+          "type": "number",
+          "system": false,
+          "required": false,
+          "default": 0
+        },
+        {
+          "name": "iva",
+          "type": "number",
+          "system": false,
+          "required": false,
+          "default": 21
+        },
+        {
+          "name": "recargo",
+          "type": "number",
+          "system": false,
+          "required": false,
+          "default": 0
+        },
+        {
+          "name": "margen",
+          "type": "number",
+          "system": false,
+          "required": false,
+          "default": 0
+        },
+        {
+          "name": "stock_actual",
+          "type": "number",
+          "system": false,
+          "required": false,
+          "default": 0
+        },
+        {
+          "name": "stock_minimo",
+          "type": "number",
+          "system": false,
+          "required": false,
+          "default": 1
+        },
+        {
+          "name": "activo",
+          "type": "bool",
+          "system": false,
+          "required": false,
+          "default": true
+        },
+        {
+          "name": "fecha_alta",
+          "type": "date",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "categoria",
+          "type": "relation",
+          "system": false,
+          "required": false,
+          "options": {
+            "collectionId": "categorias",
+            "cascadeDelete": false,
+            "maxSelect": 1,
+            "displayFields": ["nombre"]
+          }
+        },
+        {
+          "name": "proveedor",
+          "type": "relation",
+          "system": false,
+          "required": false,
+          "options": {
+            "collectionId": "proveedores",
+            "cascadeDelete": false,
+            "maxSelect": 1,
+            "displayFields": ["nombre"]
+          }
+        },
+        {
+          "name": "notas",
+          "type": "text",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "visible_online",
+          "type": "bool",
+          "system": false,
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "reservable",
+          "type": "bool",
+          "system": false,
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "porcentaje_deposito",
+          "type": "number",
+          "system": false,
+          "required": false,
+          "default": 30
+        },
+        {
+          "name": "descripcion_online",
+          "type": "text",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "imagenes",
+          "type": "file",
+          "system": false,
+          "required": false,
+          "options": {
+            "maxSelect": 5,
+            "maxSize": 5242880,
+            "mimeTypes": ["image/jpeg", "image/png", "image/webp"],
+            "thumbs": ["100x100"]
+          }
+        },
+        {
+          "name": "alerta_stock_bajo",
+          "type": "bool",
+          "system": false,
+          "required": false,
+          "default": true
+        },
+        {
+          "name": "ultima_alerta",
+          "type": "date",
+          "system": false,
+          "required": false
+        }
+      ],
+      "listRule": "",
+      "viewRule": "",
+      "createRule": "",
+      "updateRule": "",
+      "deleteRule": ""
+    },
+    {
+      "name": "clientes",
+      "type": "base",
+      "system": false,
+      "schema": [
+        {
+          "name": "nombre",
+          "type": "text",
+          "system": false,
+          "required": true
+        },
+        {
+          "name": "apellidos",
+          "type": "text",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "email",
+          "type": "email",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "telefono",
+          "type": "text",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "direccion",
+          "type": "text",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "nif",
+          "type": "text",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "fecha_alta",
+          "type": "date",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "notas",
+          "type": "text",
+          "system": false,
+          "required": false
+        }
+      ],
+      "listRule": "",
+      "viewRule": "",
+      "createRule": "",
+      "updateRule": "",
+      "deleteRule": ""
+    },
+    {
+      "name": "ventas",
+      "type": "base",
+      "system": false,
+      "schema": [
+        {
+          "name": "fecha",
+          "type": "date",
+          "system": false,
+          "required": true
+        },
+        {
+          "name": "cliente",
+          "type": "relation",
+          "system": false,
+          "required": false,
+          "options": {
+            "collectionId": "clientes",
+            "cascadeDelete": false,
+            "maxSelect": 1,
+            "displayFields": ["nombre", "apellidos"]
+          }
+        },
+        {
+          "name": "total",
+          "type": "number",
+          "system": false,
+          "required": true,
+          "default": 0
+        },
+        {
+          "name": "estado",
+          "type": "select",
+          "system": false,
+          "required": true,
+          "options": {
+            "values": ["pendiente", "pagada", "cancelada"]
+          },
+          "default": "pendiente"
+        },
+        {
+          "name": "metodo_pago",
+          "type": "select",
+          "system": false,
+          "required": false,
+          "options": {
+            "values": ["efectivo", "tarjeta", "transferencia", "otro"]
+          }
+        },
+        {
+          "name": "notas",
+          "type": "text",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "factura_emitida",
+          "type": "bool",
+          "system": false,
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "factura_id",
+          "type": "text",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "factura_verifactu_id",
+          "type": "text",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "factura_fecha",
+          "type": "date",
+          "system": false,
+          "required": false
+        }
+      ],
+      "listRule": "",
+      "viewRule": "",
+      "createRule": "",
+      "updateRule": "",
+      "deleteRule": ""
+    },
+    {
+      "name": "detalles_venta",
+      "type": "base",
+      "system": false,
+      "schema": [
+        {
+          "name": "venta",
+          "type": "relation",
+          "system": false,
+          "required": true,
+          "options": {
+            "collectionId": "ventas",
+            "cascadeDelete": true,
+            "maxSelect": 1,
+            "displayFields": ["id"]
+          }
+        },
+        {
+          "name": "producto",
+          "type": "relation",
+          "system": false,
+          "required": true,
+          "options": {
+            "collectionId": "productos",
+            "cascadeDelete": false,
+            "maxSelect": 1,
+            "displayFields": ["nombre"]
+          }
+        },
+        {
+          "name": "cantidad",
+          "type": "number",
+          "system": false,
+          "required": true,
+          "default": 1
+        },
+        {
+          "name": "precio_unitario",
+          "type": "number",
+          "system": false,
+          "required": true,
+          "default": 0
+        },
+        {
+          "name": "descuento",
+          "type": "number",
+          "system": false,
+          "required": false,
+          "default": 0
+        },
+        {
+          "name": "iva",
+          "type": "number",
+          "system": false,
+          "required": false,
+          "default": 21
+        },
+        {
+          "name": "total",
+          "type": "number",
+          "system": false,
+          "required": true,
+          "default": 0
+        }
+      ],
+      "listRule": "",
+      "viewRule": "",
+      "createRule": "",
+      "updateRule": "",
+      "deleteRule": ""
+    },
+    {
+      "name": "reclamaciones",
+      "type": "base",
+      "system": false,
+      "schema": [
+        {
+          "name": "fecha",
+          "type": "date",
+          "system": false,
+          "required": true
+        },
+        {
+          "name": "producto",
+          "type": "relation",
+          "system": false,
+          "required": true,
+          "options": {
+            "collectionId": "productos",
+            "cascadeDelete": false,
+            "maxSelect": 1,
+            "displayFields": ["nombre"]
+          }
+        },
+        {
+          "name": "defecto",
+          "type": "text",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "estado",
+          "type": "select",
+          "system": false,
+          "required": true,
+          "options": {
+            "values": ["pendiente", "en_proceso", "solucionado", "rechazado"]
+          },
+          "default": "pendiente"
+        },
+        {
+          "name": "abonado",
+          "type": "bool",
+          "system": false,
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "importe_abonado",
+          "type": "number",
+          "system": false,
+          "required": false,
+          "default": 0
+        },
+        {
+          "name": "fecha_solucion",
+          "type": "date",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "notas",
+          "type": "text",
+          "system": false,
+          "required": false
+        }
+      ],
+      "listRule": "",
+      "viewRule": "",
+      "createRule": "",
+      "updateRule": "",
+      "deleteRule": ""
+    },
+    {
+      "name": "reservas_online",
+      "type": "base",
+      "system": false,
+      "schema": [
+        {
+          "name": "producto",
+          "type": "relation",
+          "system": false,
+          "required": true,
+          "options": {
+            "collectionId": "productos",
+            "cascadeDelete": false,
+            "maxSelect": 1,
+            "displayFields": ["nombre"]
+          }
+        },
+        {
+          "name": "cliente",
+          "type": "relation",
+          "system": false,
+          "required": true,
+          "options": {
+            "collectionId": "clientes",
+            "cascadeDelete": false,
+            "maxSelect": 1,
+            "displayFields": ["nombre", "apellidos"]
+          }
+        },
+        {
+          "name": "fecha_reserva",
+          "type": "date",
+          "system": false,
+          "required": true
+        },
+        {
+          "name": "fecha_expiracion",
+          "type": "date",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "deposito_pagado",
+          "type": "number",
+          "system": false,
+          "required": false,
+          "default": 0
+        },
+        {
+          "name": "estado",
+          "type": "select",
+          "system": false,
+          "required": true,
+          "options": {
+            "values": ["pendiente", "confirmada", "completada", "cancelada"]
+          },
+          "default": "pendiente"
+        },
+        {
+          "name": "total",
+          "type": "number",
+          "system": false,
+          "required": true,
+          "default": 0
+        },
+        {
+          "name": "notas",
+          "type": "text",
+          "system": false,
+          "required": false
+        }
+      ],
+      "listRule": "",
+      "viewRule": "",
+      "createRule": "",
+      "updateRule": "",
+      "deleteRule": ""
+    },
+    {
+      "name": "facturas",
+      "type": "base",
+      "system": false,
+      "schema": [
+        {
+          "name": "numero",
+          "type": "text",
+          "system": false,
+          "required": true
+        },
+        {
+          "name": "fecha",
+          "type": "date",
+          "system": false,
+          "required": true
+        },
+        {
+          "name": "cliente",
+          "type": "relation",
+          "system": false,
+          "required": false,
+          "options": {
+            "collectionId": "clientes",
+            "cascadeDelete": false,
+            "maxSelect": 1,
+            "displayFields": ["nombre", "apellidos"]
+          }
+        },
+        {
+          "name": "venta",
+          "type": "relation",
+          "system": false,
+          "required": false,
+          "options": {
+            "collectionId": "ventas",
+            "cascadeDelete": false,
+            "maxSelect": 1,
+            "displayFields": ["id"]
+          }
+        },
+        {
+          "name": "total",
+          "type": "number",
+          "system": false,
+          "required": true,
+          "default": 0
+        },
+        {
+          "name": "estado",
+          "type": "select",
+          "system": false,
+          "required": true,
+          "options": {
+            "values": ["emitida", "pagada", "anulada"]
+          },
+          "default": "emitida"
+        },
+        {
+          "name": "pdf_url",
+          "type": "text",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "pdf_guardado",
+          "type": "bool",
+          "system": false,
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "ruta_local",
+          "type": "text",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "verifactu_id",
+          "type": "text",
+          "system": false,
+          "required": false
+        }
+      ],
+      "listRule": "",
+      "viewRule": "",
+      "createRule": "",
+      "updateRule": "",
+      "deleteRule": ""
+    },
+    {
+      "name": "configuracion_sistema",
+      "type": "base",
+      "system": false,
+      "schema": [
+        {
+          "name": "clave",
+          "type": "text",
+          "system": false,
+          "required": true
+        },
+        {
+          "name": "valor",
+          "type": "text",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "descripcion",
+          "type": "text",
+          "system": false,
+          "required": false
+        }
+      ],
+      "listRule": "",
+      "viewRule": "",
+      "createRule": "",
+      "updateRule": "",
+      "deleteRule": ""
+    },
+    {
+      "name": "backups",
+      "type": "base",
+      "system": false,
+      "schema": [
+        {
+          "name": "fecha",
+          "type": "date",
+          "system": false,
+          "required": true
+        },
+        {
+          "name": "ruta",
+          "type": "text",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "tamaño",
+          "type": "number",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "exitoso",
+          "type": "bool",
+          "system": false,
+          "required": false,
+          "default": true
+        },
+        {
+          "name": "notas",
+          "type": "text",
+          "system": false,
+          "required": false
+        }
+      ],
+      "listRule": "",
+      "viewRule": "",
+      "createRule": "",
+      "updateRule": "",
+      "deleteRule": ""
+    },
+    {
+      "name": "importaciones",
+      "type": "base",
+      "system": false,
+      "schema": [
+        {
+          "name": "fecha",
+          "type": "date",
+          "system": false,
+          "required": true
+        },
+        {
+          "name": "archivo",
+          "type": "text",
+          "system": false,
+          "required": false
+        },
+        {
+          "name": "proveedor",
+          "type": "relation",
+          "system": false,
+          "required": false,
+          "options": {
+            "collectionId": "proveedores",
+            "cascadeDelete": false,
+            "maxSelect": 1,
+            "displayFields": ["nombre"]
+          }
+        },
+        {
+          "name": "estado",
+          "type": "select",
+          "system": false,
+          "required": true,
+          "options": {
+            "values": ["pendiente", "procesando", "completado", "error"]
+          },
+          "default": "pendiente"
+        },
+        {
+          "name": "registros_procesados",
+          "type": "number",
+          "system": false,
+          "required": false,
+          "default": 0
+        },
+        {
+          "name": "registros_creados",
+          "type": "number",
+          "system": false,
+          "required": false,
+          "default": 0
+        },
+        {
+          "name": "registros_actualizados",
+          "type": "number",
+          "system": false,
+          "required": false,
+          "default": 0
+        },
+        {
+          "name": "registros_con_error",
+          "type": "number",
+          "system": false,
+          "required": false,
+          "default": 0
+        },
+        {
+          "name": "log",
+          "type": "text",
+          "system": false,
+          "required": false
+        }
+      ],
+      "listRule": "",
+      "viewRule": "",
+      "createRule": "",
+      "updateRule": "",
+      "deleteRule": ""
+    }
+  ]
+}
