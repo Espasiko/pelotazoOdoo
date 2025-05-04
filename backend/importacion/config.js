@@ -4,10 +4,13 @@
 
 // Configuración de PocketBase
 export const pocketbaseConfig = {
-  url: 'http://127.0.0.1:8090',
+  url: 'http://172.21.181.243:8090',
   admin: {
     email: 'yo@mail.com',
     password: 'Ninami12$ya'
+  },
+  clientOptions: {
+    autoCancel: false  // Deshabilitar auto-cancelación
   }
 };
 

@@ -17,16 +17,15 @@ import {
   detectarCategorias, 
   analizarNota
 } from './importador.js';
-import { verificarColecciones, autenticarAdmin } from './utils.js';
+import { verificarColecciones, autenticarAdmin, fetchAdmin } from './utils.js';
 import { pocketbaseConfig, serverConfig } from './config.js';
-import PocketBase from 'pocketbase';
 
 // Configuración de ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Inicializar PocketBase - Usar la configuración del archivo config.js
-const pb = new PocketBase(pocketbaseConfig.url);
+// URL base de PocketBase
+const baseUrl = pocketbaseConfig.url;
 
 // Configuración de Express
 const app = express();
@@ -54,14 +53,14 @@ const storage = multer.diskStorage({
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const extension = path.extname(file.originalname);
-    cb(null, file.fieldname + '-' + uniqueSuffix + extension);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
 
 const upload = multer({ 
   storage: storage,
   fileFilter: function (req, file, cb) {
+    // Verificar extensiones permitidas
     const filetypes = /csv|xlsx|xls/;
     const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = filetypes.test(file.mimetype);
@@ -75,36 +74,38 @@ const upload = multer({
 });
 
 // Middleware para verificar autenticación
-const verificarAutenticacion = async (req, res, next) => {
+async function verificarAutenticacion(req, res, next) {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'No se proporcionó token' });
+    // Verificar si hay un token de autenticación
+    const token = req.headers.authorization;
+    
+    if (!token) {
+      return res.status(401).json({ 
+        error: 'No autorizado', 
+        mensaje: 'Se requiere autenticación' 
+      });
     }
     
-    const token = authHeader.split(' ')[1];
-    
+    // Verificar si el token es válido
     try {
-      // Restaurar el token en la sesión
-      pb.authStore.save(token);
-      
-      // Verificar si el token es válido (para admin)
-      if (pb.authStore.isValid) {
-        console.log('Token válido, usuario autorizado');
-        return next();
-      }
-      
-      // Si llegamos aquí, el token no es válido
-      return res.status(401).json({ error: 'Token inválido o expirado' });
-    } catch (tokenError) {
-      console.error('Error al validar token:', tokenError);
-      return res.status(401).json({ error: 'Error al validar token' });
+      // Intentar autenticar con el token
+      await autenticarAdmin();
+      next();
+    } catch (error) {
+      console.error('Error de autenticación:', error);
+      return res.status(401).json({ 
+        error: 'No autorizado', 
+        mensaje: 'Token de autenticación inválido' 
+      });
     }
   } catch (error) {
-    console.error('Error en autenticación:', error);
-    res.status(500).json({ error: 'Error interno de autenticación' });
+    console.error('Error en verificación de autenticación:', error);
+    return res.status(500).json({ 
+      error: 'Error interno del servidor', 
+      mensaje: error.message 
+    });
   }
-};
+}
 
 // Middleware para manejar errores de autenticación
 app.use((req, res, next) => {
@@ -144,13 +145,19 @@ app.post('/api/importar', upload.single('archivo'), async (req, res) => {
     // Registrar la importación en PocketBase
     try {
       // Crear registro de importación
-      const importacion = await pb.collection('importaciones').create({
-        fecha: new Date().toISOString(),
-        proveedor: proveedor,
-        tipo: tipo,
-        estado: 'procesando',
-        archivo: req.file.originalname,
-        log: `Iniciando importación de ${tipo} desde ${proveedor}...`
+      const importacion = await fetchAdmin(`${baseUrl}/api/collections/importaciones/records`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          fecha: new Date().toISOString(),
+          proveedor: proveedor,
+          tipo: tipo,
+          estado: 'procesando',
+          archivo: req.file.originalname,
+          log: `Iniciando importación de ${tipo} desde ${proveedor}...`
+        })
       });
       
       console.log(`Importación registrada con ID: ${importacion.id}`);
@@ -166,17 +173,28 @@ app.post('/api/importar', upload.single('archivo'), async (req, res) => {
             let proveedorInfo = null;
             try {
               // Buscar si el proveedor ya existe
-              const proveedorResult = await pb.collection('proveedores').getFirstListItem(`nombre~"${proveedor}"`);
+              const proveedorResult = await fetchAdmin(`${baseUrl}/api/collections/proveedores/records`, {
+                method: 'GET',
+                params: {
+                  filter: `nombre~"${proveedor}"`
+                }
+              });
               proveedorInfo = proveedorResult;
               console.log(`Proveedor encontrado: ${proveedorInfo.id}`);
             } catch (error) {
               // Si no existe, crear el proveedor
               try {
                 // Intentar crear el proveedor
-                proveedorInfo = await pb.collection('proveedores').create({
-                  nombre: proveedor,
-                  activo: true,
-                  fecha_alta: new Date().toISOString()
+                proveedorInfo = await fetchAdmin(`${baseUrl}/api/collections/proveedores/records`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    nombre: proveedor,
+                    activo: true,
+                    fecha_alta: new Date().toISOString()
+                  })
                 });
                 console.log(`Proveedor creado: ${proveedorInfo.id}`);
               } catch (createError) {
@@ -191,9 +209,15 @@ app.post('/api/importar', upload.single('archivo'), async (req, res) => {
             
             // Actualizar estado de la importación
             try {
-              await pb.collection('importaciones').update(importacion.id, {
-                estado: resultado.exito ? 'completado' : 'error',
-                log: `Importación finalizada. Creados: ${resultado.creados}, Actualizados: ${resultado.actualizados}, Errores: ${resultado.errores}, Devoluciones: ${resultado.devoluciones || 0}`
+              await fetchAdmin(`${baseUrl}/api/collections/importaciones/records/${importacion.id}`, {
+                method: 'PATCH',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  estado: resultado.exito ? 'completado' : 'error',
+                  log: `Importación finalizada. Creados: ${resultado.creados}, Actualizados: ${resultado.actualizados}, Errores: ${resultado.errores}, Devoluciones: ${resultado.devoluciones || 0}`
+                })
               });
             } catch (updateError) {
               console.error('Error al actualizar estado de importación:', updateError);
@@ -204,9 +228,15 @@ app.post('/api/importar', upload.single('archivo'), async (req, res) => {
           } catch (error) {
             console.error('Error en la importación:', error);
             try {
-              await pb.collection('importaciones').update(importacion.id, {
-                estado: 'error',
-                log: `Error en la importación: ${error.message}`
+              await fetchAdmin(`${baseUrl}/api/collections/importaciones/records/${importacion.id}`, {
+                method: 'PATCH',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  estado: 'error',
+                  log: `Error en la importación: ${error.message}`
+                })
               });
             } catch (updateError) {
               console.error('Error al actualizar estado de error:', updateError);
@@ -217,9 +247,15 @@ app.post('/api/importar', upload.single('archivo'), async (req, res) => {
         .catch(async (error) => {
           console.error('Error al procesar el archivo:', error);
           try {
-            await pb.collection('importaciones').update(importacion.id, {
-              estado: 'error',
-              log: `Error al procesar el archivo: ${error.message}`
+            await fetchAdmin(`${baseUrl}/api/collections/importaciones/records/${importacion.id}`, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                estado: 'error',
+                log: `Error al procesar el archivo: ${error.message}`
+              })
             });
           } catch (updateError) {
             console.error('Error al actualizar estado de error:', updateError);
@@ -284,8 +320,11 @@ app.get('/api/importaciones', async (req, res) => {
     
     try {
       // Intentar obtener la lista de importaciones
-      const importaciones = await pb.collection('importaciones').getList(1, 50, {
-        sort: '-fecha'
+      const importaciones = await fetchAdmin(`${baseUrl}/api/collections/importaciones/records`, {
+        method: 'GET',
+        params: {
+          sort: '-fecha'
+        }
       });
       
       console.log(`Obtenidas ${importaciones.items.length} importaciones`);
@@ -332,7 +371,9 @@ app.get('/api/importaciones/:id', async (req, res) => {
     
     try {
       const { id } = req.params;
-      const importacion = await pb.collection('importaciones').getOne(id);
+      const importacion = await fetchAdmin(`${baseUrl}/api/collections/importaciones/records/${id}`, {
+        method: 'GET'
+      });
       
       console.log(`Obtenidos detalles de importación ${id}`);
       res.json(importacion);
@@ -379,8 +420,11 @@ app.get('/api/proveedores', async (req, res) => {
     }
     
     try {
-      const proveedores = await pb.collection('proveedores').getList(1, 100, {
-        sort: 'nombre'
+      const proveedores = await fetchAdmin(`${baseUrl}/api/collections/proveedores/records`, {
+        method: 'GET',
+        params: {
+          sort: 'nombre'
+        }
       });
       
       console.log(`Obtenidos ${proveedores.items.length} proveedores`);
@@ -413,8 +457,11 @@ app.get('/api/proveedores', async (req, res) => {
 // Endpoint para obtener categorías
 app.get('/api/categorias', verificarAutenticacion, async (req, res) => {
   try {
-    const categorias = await pb.collection('categorias').getList(1, 100, {
-      sort: 'nombre'
+    const categorias = await fetchAdmin(`${baseUrl}/api/collections/categorias/records`, {
+      method: 'GET',
+      params: {
+        sort: 'nombre'
+      }
     });
     
     res.json(categorias);
@@ -434,10 +481,13 @@ app.get('/api/productos', verificarAutenticacion, async (req, res) => {
       filterQuery = `nombre~"${filter}" || codigo~"${filter}"`;
     }
     
-    const productos = await pb.collection('productos').getList(parseInt(page), parseInt(perPage), {
-      filter: filterQuery,
-      sort: sort,
-      expand: 'categoria,proveedor'
+    const productos = await fetchAdmin(`${baseUrl}/api/collections/productos/records`, {
+      method: 'GET',
+      params: {
+        filter: filterQuery,
+        sort: sort,
+        expand: 'categoria,proveedor'
+      }
     });
     
     res.json(productos);
@@ -452,9 +502,12 @@ app.get('/api/devoluciones', verificarAutenticacion, async (req, res) => {
   try {
     const { page = 1, perPage = 20, sort = '-fecha' } = req.query;
     
-    const devoluciones = await pb.collection('devoluciones').getList(parseInt(page), parseInt(perPage), {
-      sort: sort,
-      expand: 'proveedor'
+    const devoluciones = await fetchAdmin(`${baseUrl}/api/collections/devoluciones/records`, {
+      method: 'GET',
+      params: {
+        sort: sort,
+        expand: 'proveedor'
+      }
     });
     
     res.json(devoluciones);
@@ -482,7 +535,7 @@ app.get('/api/test/pocketbase', async (req, res) => {
     // Probar una operación simple: obtener la lista de colecciones directamente
     try {
       // Verificar si PocketBase está respondiendo
-      const healthCheck = await fetch(`${pocketbaseConfig.url}/api/health`);
+      const healthCheck = await fetch(`${baseUrl}/api/health`);
       if (!healthCheck.ok) {
         throw new Error(`PocketBase no responde: ${healthCheck.status}`);
       }
@@ -507,7 +560,9 @@ app.get('/api/test/pocketbase', async (req, res) => {
 app.get('/api/test/importacion/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const importacion = await pb.collection('importaciones').getOne(id);
+    const importacion = await fetchAdmin(`${baseUrl}/api/collections/importaciones/records/${id}`, {
+      method: 'GET'
+    });
     res.json(importacion);
   } catch (error) {
     console.error(`Error al obtener importación ${req.params.id}:`, error);
@@ -526,28 +581,40 @@ app.post('/api/test/importacion-completa', upload.single('file'), async (req, re
     
     // Autenticarse como admin
     try {
-      await pb.admins.authWithPassword('yo@mail.com', 'Ninami12$ya');
+      await autenticarAdmin();
     } catch (authError) {
       return res.status(500).json({ error: 'Error de autenticación', mensaje: authError.message });
     }
     
     // Crear registro de importación
-    const importacion = await pb.collection('importaciones').create({
-      fecha: new Date().toISOString(),
-      proveedor: proveedor,
-      tipo: tipo,
-      estado: 'procesando',
-      archivo: req.file.originalname,
-      log: `Iniciando importación de prueba: ${new Date().toISOString()}\n`
+    const importacion = await fetchAdmin(`${baseUrl}/api/collections/importaciones/records`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fecha: new Date().toISOString(),
+        proveedor: proveedor,
+        tipo: tipo,
+        estado: 'procesando',
+        archivo: req.file.originalname,
+        log: `Iniciando importación de prueba: ${new Date().toISOString()}\n`
+      })
     });
     
     // Procesar el archivo
     const resultado = await importarDatos(req.file.path, proveedor, tipo, importacion.id);
     
     // Actualizar estado de la importación
-    await pb.collection('importaciones').update(importacion.id, {
-      estado: resultado.exito ? 'completado' : 'error',
-      resultado: JSON.stringify(resultado)
+    await fetchAdmin(`${baseUrl}/api/collections/importaciones/records/${importacion.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        estado: resultado.exito ? 'completado' : 'error',
+        resultado: JSON.stringify(resultado)
+      })
     });
     
     res.json({
@@ -585,6 +652,6 @@ verificarColecciones().then((resultado) => {
 const PORT = serverConfig.port || 3100;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Servidor de importación iniciado en http://localhost:${PORT}`);
-  console.log(`Conectado a PocketBase en ${pocketbaseConfig.url}`);
+  console.log(`Conectado a PocketBase en ${baseUrl}`);
   console.log('CORS configurado para permitir solicitudes desde cualquier origen');
 });

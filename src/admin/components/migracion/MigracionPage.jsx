@@ -162,27 +162,54 @@ export const MigracionPage = () => {
   };
 
   // Manejar importación de datos
-  const handleImport = () => {
-    // Aquí implementaríamos la lógica real de importación
-    // Por ahora, simulamos una importación exitosa
-    
-    // Contar registros mapeados correctamente
-    const validRecords = data.filter(row => {
-      // Un registro es válido si al menos tiene un campo mapeado con datos
-      return Object.keys(mappings).some(header => 
-        mappings[header] && row[header] && row[header].trim() !== ''
-      );
-    });
-    
-    setImportResult({
-      success: true,
-      totalRecords: data.length,
-      importedRecords: validRecords.length,
-      errors: data.length - validRecords.length
-    });
-    
-    // Avanzar al siguiente paso
-    setActiveStep(activeStep + 1);
+  const handleImport = async () => {
+    try {
+      // Avanzar al siguiente paso para mostrar la pantalla de carga
+      setActiveStep(activeStep + 1);
+      
+      // Preparar los datos para enviar al servidor
+      const formData = new FormData();
+      formData.append('archivo', file);
+      formData.append('proveedor', targetResource);
+      formData.append('tipo', 'productos');
+      
+      // Añadir los mapeos de campos
+      formData.append('mappings', JSON.stringify(mappings));
+      
+      console.log('Enviando datos al servidor de importación...');
+      
+      // Llamar al endpoint de importación
+      const response = await fetch('http://localhost:3100/api/importar', {
+        method: 'POST',
+        body: formData,
+        // No es necesario headers con FormData
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Error en la importación: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+      
+      const result = await response.json();
+      console.log('Respuesta del servidor:', result);
+      
+      setImportResult({
+        success: true,
+        totalRecords: data.length,
+        importedRecords: result.registrosImportados || 0,
+        errors: result.errores || 0,
+        detalles: result.detalles || null
+      });
+    } catch (error) {
+      console.error('Error en la importación:', error);
+      setImportResult({
+        success: false,
+        totalRecords: data.length,
+        importedRecords: 0,
+        errors: data.length,
+        errorMessage: error.message
+      });
+    }
   };
 
   // Manejar navegación entre pasos
