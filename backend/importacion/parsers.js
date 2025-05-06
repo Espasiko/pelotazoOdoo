@@ -4,234 +4,267 @@
  */
 
 /**
- * Parser genérico para cualquier proveedor
+ * Parser genérico universal adaptable por mapeo de columnas
+ * Mejorado: incluye heurística para variantes de nombres de columnas y logs de depuración.
  * @param {Array} datos - Datos a procesar
  * @param {string} tipo - Tipo de importación (productos, precios, stock)
+ * @param {Object} [config] - Configuración opcional (mapeo de columnas)
  * @returns {Array} - Datos procesados y normalizados
  */
-export function parserGenerico(datos, tipo) {
-  console.log(`Usando parser genérico para ${datos.length} registros de tipo ${tipo}`);
-  console.log('Muestra de datos:', JSON.stringify(datos.slice(0, 2), null, 2));
-  
-  // Si no hay datos, devolver array vacío
+export function parserGenericoUniversal(datos, tipo, config = {}) {
   if (!datos || datos.length === 0) {
-    console.log('No hay datos para procesar');
+    console.warn('[parserGenericoUniversal] Datos vacíos');
     return [];
   }
-  
-  // Obtener todas las claves posibles de los datos
-  const todasLasClaves = new Set();
-  datos.forEach(item => {
-    Object.keys(item).forEach(key => todasLasClaves.add(key));
+
+  // Variantes de nombres para heurística
+  const variantes = {
+    codigo: ['CÓDIGO', 'COD', 'REFERENCIA', 'REF', 'SKU', 'ID', 'CODIGO', 'EAN', 'UPC'],
+    nombre: ['DESCRIPCIÓN', 'DESC', 'NOMBRE', 'PRODUCTO', 'ARTICULO', 'DENOMINACION', 'TITULO'],
+    unidades: ['UNID', 'CANTIDAD', 'STOCK', 'EXISTENCIAS', 'DISPONIBLE', 'INVENTARIO'],
+    precio: ['IMPORTE', 'PRECIO', 'PVP', 'TARIFA', 'COSTE', 'VALOR', 'IMPORTE BRUTO'],
+    pvp: ['PVP', 'PRECIO VENTA', 'PRECIO FINAL', 'PVP FINAL', 'P.V.P', 'P.V.P WEB', 'P.V.P FINAL CLIENTE'],
+    pvp_final: ['FINAL', 'PVP FINAL', 'PRECIO FINAL', 'P.V.P FINAL'],
+    vendidas: ['VENDIDAS', 'VENDIDO', 'SALIDA'],
+    tienda: ['TIENDA', 'EN TIENDA', 'STOCK TIENDA', 'QUEDAN EN TIENDA'],
+    nota: ['NOTA', 'OBS', 'OBSERVACION', 'OBSERVACIONES'],
+    marca: ['MARCA', 'FABRICANTE', 'BRAND']
+  };
+
+  // Detectar encabezado (primera fila con algún campo clave)
+  let header = null;
+  let headerIdx = 0;
+  for (let i = 0; i < datos.length; i++) {
+    const row = datos[i];
+    const values = Object.values(row).map(v => (v || '').toString().toUpperCase());
+    if (values.some(v => variantes.codigo.includes(v)) && values.some(v => variantes.nombre.includes(v))) {
+      header = row;
+      headerIdx = i;
+      break;
+    }
+  }
+  if (!header) header = datos[0];
+
+  // Mapeo automático o por config
+  const mapCol = (nombre, variantesArr) => {
+    if (config[nombre]) return config[nombre];
+    
+    // CASO ESPECIAL: Archivos ALMCE con columnas __EMPTY_X
+    // Buscar en valores de encabezado para archivos con columnas __EMPTY_X
+    for (const key of Object.keys(header)) {
+      if (key.startsWith('__EMPTY_')) {
+        const val = (header[key] || '').toString().toUpperCase();
+        if (variantesArr.some(v => val.includes(v))) {
+          console.log(`[parserGenericoUniversal] Mapeo especial: Columna ${key} con valor "${val}" mapeada a ${nombre}`);
+          return key;
+        }
+      }
+    }
+    
+    // Buscar por variantes en el header
+    for (const key of Object.keys(header)) {
+      const val = (header[key] || '').toString().toUpperCase();
+      if (variantesArr.some(v => val.includes(v))) return key;
+    }
+    // Buscar por nombre de columna
+    for (const key of Object.keys(header)) {
+      if (key.toUpperCase().includes(nombre.toUpperCase())) return key;
+    }
+    // Buscar por variantes en key
+    for (const key of Object.keys(header)) {
+      if (variantesArr.some(v => key.toUpperCase().includes(v))) return key;
+    }
+    return null;
+  };
+  const colCodigo = mapCol('CÓDIGO', variantes.codigo);
+  const colDesc = mapCol('DESCRIPCIÓN', variantes.nombre);
+  const colUnidades = mapCol('UNID', variantes.unidades);
+  const colPrecio = mapCol('IMPORTE', variantes.precio);
+  const colPVP = mapCol('PVP', variantes.pvp);
+  const colPVPFinal = mapCol('FINAL', variantes.pvp_final);
+  const colVendidas = mapCol('VENDIDAS', variantes.vendidas);
+  const colTienda = mapCol('TIENDA', variantes.tienda);
+  const colNotas = mapCol('NOTA', variantes.nota);
+  const colMarca = mapCol('MARCA', variantes.marca);
+
+  // Log de mapeo detectado
+  console.log('[parserGenericoUniversal] Mapeo detectado:', {
+    colCodigo, colDesc, colUnidades, colPrecio, colPVP, colPVPFinal, colVendidas, colTienda, colNotas,
+    colMarca
   });
-  console.log('Claves encontradas en los datos:', Array.from(todasLasClaves));
-  
-  // Patrones comunes para identificar campos
-  const patronesCodigo = ['COD', 'REFERENCIA', 'REF', 'SKU', 'EAN', 'UPC', 'ID', 'CODIGO'];
-  const patronesNombre = ['DESC', 'NOMBRE', 'ARTICULO', 'PRODUCTO', 'DENOMINACION', 'TITULO'];
-  const patronesPrecio = ['PRECIO', 'PVP', 'TARIFA', 'IMPORTE', 'COSTE', 'VALOR'];
-  const patronesStock = ['STOCK', 'CANTIDAD', 'EXISTENCIAS', 'DISPONIBLE', 'INVENTARIO'];
-  const patronesMarca = ['MARCA', 'FABRICANTE', 'PROVEEDOR', 'DISTRIBUIDOR'];
-  const patronesCategoria = ['CATEGORIA', 'FAMILIA', 'GRUPO', 'SECCION', 'DEPARTAMENTO', 'TIPO'];
-  
-  // Normalizar los datos según el tipo de importación
-  if (tipo === 'productos') {
-    return datos.map((item, index) => {
-      // Buscar campos de código en cualquier clave disponible
-      let codigo = null;
-      for (const key of Object.keys(item)) {
-        if (typeof item[key] === 'string' || typeof item[key] === 'number') {
-          // Comprobar si la clave coincide con algún patrón de código
-          if (patronesCodigo.some(patron => key.toUpperCase().includes(patron))) {
-            codigo = item[key];
-            break;
-          }
-        }
-      }
-      
-      // Si no se encontró un código, buscar un valor numérico que podría ser un código
-      if (!codigo) {
-        for (const key of Object.keys(item)) {
-          if (!isNaN(item[key]) && item[key] !== '' && item[key] !== null) {
-            codigo = item[key];
-            break;
-          }
-        }
-      }
-      
-      // Si aún no se encontró un código, generar uno
-      if (!codigo) {
-        codigo = `GEN-${index}`;
-      }
-      
-      // Buscar campos de nombre/descripción
-      let nombre = null;
-      for (const key of Object.keys(item)) {
-        if (typeof item[key] === 'string' && item[key].length > 3) {
-          // Comprobar si la clave coincide con algún patrón de nombre
-          if (patronesNombre.some(patron => key.toUpperCase().includes(patron))) {
-            nombre = item[key];
-            break;
-          }
-        }
-      }
-      
-      // Si no se encontró un nombre, usar el primer campo de texto largo
-      if (!nombre) {
-        for (const key of Object.keys(item)) {
-          if (typeof item[key] === 'string' && item[key].length > 3) {
-            nombre = item[key];
-            break;
-          }
-        }
-      }
-      
-      // Si aún no se encontró un nombre, usar un genérico
-      if (!nombre) {
-        nombre = `Producto ${index}`;
-      }
-      
-      // Buscar campos de precio
-      let precio = 0;
-      for (const key of Object.keys(item)) {
-        // Comprobar si la clave coincide con algún patrón de precio
-        if (patronesPrecio.some(patron => key.toUpperCase().includes(patron))) {
-          const valor = parseFloat(item[key]);
-          if (!isNaN(valor)) {
-            precio = valor;
-            break;
-          }
-        }
-      }
-      
-      // Si no se encontró un precio, buscar cualquier valor numérico que podría ser un precio
-      if (precio === 0) {
-        for (const key of Object.keys(item)) {
-          if (!key.toUpperCase().includes('STOCK') && !key.toUpperCase().includes('CANTIDAD')) {
-            const valor = parseFloat(item[key]);
-            if (!isNaN(valor) && valor > 0) {
-              precio = valor;
-              break;
-            }
-          }
-        }
-      }
-      
-      // Buscar campos de stock
-      let stock = 0;
-      for (const key of Object.keys(item)) {
-        // Comprobar si la clave coincide con algún patrón de stock
-        if (patronesStock.some(patron => key.toUpperCase().includes(patron))) {
-          const valor = parseInt(item[key], 10);
-          if (!isNaN(valor)) {
-            stock = valor;
-            break;
-          }
-        }
-      }
-      
-      // Buscar campos de marca
-      let marca = '';
-      for (const key of Object.keys(item)) {
-        // Comprobar si la clave coincide con algún patrón de marca
-        if (patronesMarca.some(patron => key.toUpperCase().includes(patron))) {
-          if (typeof item[key] === 'string' && item[key].length > 0) {
-            marca = item[key];
-            break;
-          }
-        }
-      }
-      
-      // Buscar campos de categoría
-      let categoria = '';
-      for (const key of Object.keys(item)) {
-        // Comprobar si la clave coincide con algún patrón de categoría
-        if (patronesCategoria.some(patron => key.toUpperCase().includes(patron))) {
-          if (typeof item[key] === 'string' && item[key].length > 0) {
-            categoria = item[key];
-            break;
-          }
-        }
-      }
-      
-      // Crear objeto normalizado
-      return {
-        codigo: codigo.toString(),
-        nombre: nombre.toString(),
-        descripcion: nombre.toString(),
-        precio: isNaN(precio) ? 0 : precio,
-        stock: isNaN(stock) ? 0 : stock,
-        proveedor: 'GENERICO',
-        marca: marca,
-        categoria: categoria,
-        visible: true,
-        destacado: false,
-        datos_origen: item
-      };
-    });
-  } else if (tipo === 'precios') {
-    return datos.map((item, index) => {
-      // Buscar campos de código
-      let codigo = null;
-      for (const key of Object.keys(item)) {
-        if (patronesCodigo.some(patron => key.toUpperCase().includes(patron))) {
-          codigo = item[key];
-          break;
-        }
-      }
-      
-      // Buscar campos de precio
-      let precio = 0;
-      for (const key of Object.keys(item)) {
-        if (patronesPrecio.some(patron => key.toUpperCase().includes(patron))) {
-          const valor = parseFloat(item[key]);
-          if (!isNaN(valor)) {
-            precio = valor;
-            break;
-          }
-        }
-      }
-      
-      return {
-        codigo: codigo ? codigo.toString() : `GEN-${index}`,
-        precio: isNaN(precio) ? 0 : precio,
-        datos_origen: item
-      };
-    });
-  } else if (tipo === 'stock') {
-    return datos.map((item, index) => {
-      // Buscar campos de código
-      let codigo = null;
-      for (const key of Object.keys(item)) {
-        if (patronesCodigo.some(patron => key.toUpperCase().includes(patron))) {
-          codigo = item[key];
-          break;
-        }
-      }
-      
-      // Buscar campos de stock
-      let stock = 0;
-      for (const key of Object.keys(item)) {
-        if (patronesStock.some(patron => key.toUpperCase().includes(patron))) {
-          const valor = parseInt(item[key], 10);
-          if (!isNaN(valor)) {
-            stock = valor;
-            break;
-          }
-        }
-      }
-      
-      return {
-        codigo: codigo ? codigo.toString() : `GEN-${index}`,
-        stock: isNaN(stock) ? 0 : stock,
-        datos_origen: item
-      };
-    });
+
+  // CASO ESPECIAL: Si no se encontró colPVP pero hay colPVPFinal, usar colPVPFinal como colPVP
+  if (!colPVP && colPVPFinal) {
+    console.log('[parserGenericoUniversal] Usando colPVPFinal como colPVP ya que no se encontró colPVP');
+    colPVP = colPVPFinal;
   }
   
-  // Si el tipo no es reconocido, devolver los datos sin procesar
-  console.log(`Tipo de importación no reconocido: ${tipo}`);
-  return datos;
+  // CASO ESPECIAL: Si no se encontró colPVP pero hay colPrecio, usar colPrecio con un markup como colPVP
+  if (!colPVP && colPrecio) {
+    console.log('[parserGenericoUniversal] Usando colPrecio con markup como colPVP ya que no se encontró colPVP');
+    // Usaremos colPrecio con un markup del 30% como fallback para colPVP
+    // Esto se hará en el procesamiento de cada fila
+  }
+
+  if (!colCodigo || !colDesc) {
+    console.error('[parserGenericoUniversal] No se detectaron columnas de código o descripción. Revisa el archivo o pasa un mapeo manual.');
+    return [];
+  }
+
+  // Función para limpiar precios
+  const limpiarPrecio = v => parseFloat((v || '').toString().replace(/[^0-9,\.]/g, '').replace(',', '.')) || 0;
+
+  // Procesar filas
+  let categoriaActual = null;
+  const productos = [];
+  for (let i = headerIdx + 1; i < datos.length; i++) {
+    const row = datos[i];
+    
+    // DETECCIÓN MEJORADA DE CATEGORÍAS
+    // 1. Detectar fila con texto solo en la columna de categoría (caso simple)
+    // 2. Detectar filas que parecen ser encabezados de categoría (texto en __EMPTY_1 sin código ni descripción)
+    const posibleCategoria = row['__EMPTY_1'] || row['__EMPTY'] || '';
+    
+    // Caso 1: Fila con una sola propiedad que tiene un valor significativo
+    const esCategoriaSimple = 
+      Object.keys(row).length === 1 && 
+      Object.values(row)[0] && 
+      (Object.values(row)[0] + '').length > 2;
+    
+    // Caso 2: Fila con __EMPTY_1 que contiene un texto que parece categoría
+    // y no tiene código ni descripción (no es un producto)
+    const esCategoriaTipoAlmce = 
+      posibleCategoria.length > 2 && 
+      (!row[colCodigo] || !row[colDesc]) &&
+      (
+        // Palabras clave que suelen indicar categorías
+        posibleCategoria.toUpperCase().includes('LAVADORA') ||
+        posibleCategoria.toUpperCase().includes('SECADORA') ||
+        posibleCategoria.toUpperCase().includes('FRIGORÍFICO') ||
+        posibleCategoria.toUpperCase().includes('CONGELADOR') ||
+        posibleCategoria.toUpperCase().includes('HORNO') ||
+        posibleCategoria.toUpperCase().includes('MICROONDAS') ||
+        posibleCategoria.toUpperCase().includes('CAMPANA') ||
+        posibleCategoria.toUpperCase().includes('VITROCERÁMICA') ||
+        posibleCategoria.toUpperCase().includes('LAVAVAJILLAS') ||
+        // Marcas conocidas que a veces aparecen como "categorías"
+        posibleCategoria.toUpperCase() === 'CORBERÓ' ||
+        posibleCategoria.toUpperCase() === 'CANDY' ||
+        posibleCategoria.toUpperCase() === 'BEKO' ||
+        posibleCategoria.toUpperCase() === 'BALAY' ||
+        posibleCategoria.toUpperCase() === 'BOSCH'
+      );
+    
+    if (esCategoriaSimple || esCategoriaTipoAlmce) {
+      // Es una categoría, actualizar categoriaActual
+      const nuevaCategoria = esCategoriaSimple ? Object.values(row)[0].toString().trim() : posibleCategoria.trim();
+      console.log(`[parserGenericoUniversal] Detectada categoría: "${nuevaCategoria}" en fila ${i}`);
+      categoriaActual = nuevaCategoria;
+      continue; // Pasar a la siguiente fila
+    }
+    
+    // Detectar producto: debe tener código y descripción
+    const codigo = row[colCodigo];
+    const nombre = row[colDesc];
+    if (!codigo || !nombre) continue;
+
+    // Log para depurar PVP
+    console.log(`[parserGenericoUniversal] Debug PVP - Fila ${i}:`, JSON.stringify(row).substring(0, 300)); // Loguear parte de la fila
+    console.log(`[parserGenericoUniversal] Debug PVP - Mapeo colPVP: ${colPVP}`);
+    
+    // Obtener precio de venta (con fallbacks)
+    let precioVentaCrudo;
+    if (colPVP) {
+      precioVentaCrudo = row[colPVP];
+    } else if (colPrecio) {
+      // Si no hay colPVP, usar colPrecio con un markup del 30%
+      const precioCosto = parseFloat(row[colPrecio] || 0);
+      precioVentaCrudo = precioCosto * 1.3; // 30% de markup
+    } else {
+      precioVentaCrudo = undefined;
+    }
+    
+    console.log(`[parserGenericoUniversal] Debug PVP - Valor crudo para PVP: ${precioVentaCrudo}`);
+    
+    const precioVentaLimpio = limpiarPrecio(precioVentaCrudo);
+    console.log(`[parserGenericoUniversal] Debug PVP - Valor PVP después de limpiarPrecio: ${precioVentaLimpio}`);
+
+    // EXTRAER MARCA
+    let marcaExtraida = null;
+    if (colMarca && row[colMarca]) { 
+      marcaExtraida = row[colMarca].toString().trim();
+    } else if (nombre) { 
+      const palabrasNombre = nombre.toString().trim().split(' ');
+      // Heurística simple: si la primera palabra es común como marca (ej. todo mayúsculas, o corta y común)
+      // Esto es muy básico y podría necesitar refinamiento o una lista de marcas conocidas.
+      if (palabrasNombre.length > 0) {
+        const primeraPalabra = palabrasNombre[0];
+        // Considerar marca si es TODO MAYÚSCULAS y tiene entre 2 y 10 caracteres (ej. SONY, LG, HP)
+        // O si es una palabra común de marca (esto requeriría una lista)
+        if (primeraPalabra.length >= 2 && primeraPalabra.length <= 15 && primeraPalabra === primeraPalabra.toUpperCase()) {
+          // Podríamos tener una lista de palabras comunes que NO son marcas aquí (ej. 'PACK', 'SET', 'KIT', 'UNIDAD', 'CAJA', 'ROLLO')
+          if (!['PACK', 'SET', 'KIT', 'UNIDAD', 'CAJA', 'ROLLO'].includes(primeraPalabra)) {
+             marcaExtraida = primeraPalabra;
+          }
+        }
+        // Si no se extrajo así, y hay más de una palabra, podríamos tomar las dos primeras si la segunda es corta
+        if (!marcaExtraida && palabrasNombre.length > 1) {
+            const dosPrimeras = `${palabrasNombre[0]} ${palabrasNombre[1]}`;
+            // Ejemplo: "BOSCH Herramienta" -> "BOSCH" o "BOSCH Herramienta" si "Herramienta" no es genérico
+            // Esto se vuelve complejo rápidamente. Una columna MARCA es lo ideal.
+            // Por ahora, nos quedamos con la primera palabra si cumple la condición anterior.
+        }
+      }
+    }
+
+    // Notas
+    let nota = '';
+    if (colNotas && row[colNotas]) nota = row[colNotas];
+    // Buscar notas en campos extra
+    for (const key of Object.keys(row)) {
+      if ((key + '').toUpperCase().includes('NOTA') || (key + '').toUpperCase().includes('OBS')) {
+        nota = row[key];
+      }
+    }
+    productos.push({
+      codigo: codigo.toString().trim(),
+      nombre: nombre.toString().trim(),
+      categoriaExtraidaDelParser: categoriaActual, 
+      marcaExtraidaDelParser: marcaExtraida, 
+      stock: parseInt(row[colUnidades] || '0', 10) || 0,
+      precio_costo: limpiarPrecio(colPrecio ? row[colPrecio] : undefined),
+      precio_venta: precioVentaLimpio, // Usar el valor ya limpiado
+      pvp_final: limpiarPrecio(colPVPFinal ? row[colPVPFinal] : undefined),
+      vendidas: parseInt(row[colVendidas] || '0', 10) || 0,
+      stock_tienda: parseInt(row[colTienda] || '0', 10) || 0,
+      nota,
+      datos_origen: row
+    });
+  }
+  console.log(`[parserGenericoUniversal] Productos extraídos: ${productos.length}`);
+  return productos;
+}
+
+/**
+ * Parser específico para ALMCE (Almacén de Electrodomésticos)
+ * @param {Array} datos - Datos a procesar
+ * @param {string} tipo - Tipo de importación
+ * @returns {Array} - Datos procesados y normalizados
+ */
+export function parserALMCE(datos, tipo) {
+  // Mapeo específico ALMCE
+  const config = {
+    'CÓDIGO': '__EMPTY_1',
+    'DESCRIPCIÓN': '__EMPTY_2',
+    'UNID': '__EMPTY_3',
+    'IMPORTE': '__EMPTY_4',
+    'PVP': '__EMPTY_8',
+    'FINAL': '__EMPTY_9',
+    'VENDIDAS': '__EMPTY_11',
+    'TIENDA': '__EMPTY_12',
+    'NOTA': '__EMPTY_16'
+  };
+  return parserGenericoUniversal(datos, tipo, config);
 }
 
 /**
@@ -241,9 +274,7 @@ export function parserGenerico(datos, tipo) {
  * @returns {Array} - Datos procesados
  */
 export function parseCecotec(datos, tipo) {
-  console.log(`Usando parser específico para Cecotec (${datos.length} registros)`);
-  // Por ahora, usar el parser genérico
-  return parserGenerico(datos, tipo);
+  return parserGenericoUniversal(datos, tipo);
 }
 
 /**
@@ -253,9 +284,7 @@ export function parseCecotec(datos, tipo) {
  * @returns {Array} - Datos procesados
  */
 export function parseBSH(datos, tipo) {
-  console.log(`Usando parser específico para BSH (${datos.length} registros)`);
-  // Por ahora, usar el parser genérico
-  return parserGenerico(datos, tipo);
+  return parserGenericoUniversal(datos, tipo);
 }
 
 /**
@@ -265,9 +294,7 @@ export function parseBSH(datos, tipo) {
  * @returns {Array} - Datos procesados
  */
 export function parseJata(datos, tipo) {
-  console.log(`Usando parser específico para Jata (${datos.length} registros)`);
-  // Por ahora, usar el parser genérico
-  return parserGenerico(datos, tipo);
+  return parserGenericoUniversal(datos, tipo);
 }
 
 /**
@@ -277,9 +304,7 @@ export function parseJata(datos, tipo) {
  * @returns {Array} - Datos procesados
  */
 export function parseOrbegozo(datos, tipo) {
-  console.log(`Usando parser específico para Orbegozo (${datos.length} registros)`);
-  // Por ahora, usar el parser genérico
-  return parserGenerico(datos, tipo);
+  return parserGenericoUniversal(datos, tipo);
 }
 
 /**
@@ -289,9 +314,7 @@ export function parseOrbegozo(datos, tipo) {
  * @returns {Array} - Datos procesados
  */
 export function parseAlfadyser(datos, tipo) {
-  console.log(`Usando parser específico para Alfadyser (${datos.length} registros)`);
-  // Por ahora, usar el parser genérico
-  return parserGenerico(datos, tipo);
+  return parserGenericoUniversal(datos, tipo);
 }
 
 /**
@@ -301,9 +324,7 @@ export function parseAlfadyser(datos, tipo) {
  * @returns {Array} - Datos procesados
  */
 export function parseVitrokitchen(datos, tipo) {
-  console.log(`Usando parser específico para Vitrokitchen (${datos.length} registros)`);
-  // Por ahora, usar el parser genérico
-  return parserGenerico(datos, tipo);
+  return parserGenericoUniversal(datos, tipo);
 }
 
 /**
@@ -313,9 +334,7 @@ export function parseVitrokitchen(datos, tipo) {
  * @returns {Array} - Datos procesados
  */
 export function parseElectrodirecto(datos, tipo) {
-  console.log(`Usando parser específico para Electrodirecto (${datos.length} registros)`);
-  // Por ahora, usar el parser genérico
-  return parserGenerico(datos, tipo);
+  return parserGenericoUniversal(datos, tipo);
 }
 
 /**
@@ -324,123 +343,14 @@ export function parseElectrodirecto(datos, tipo) {
  * @param {string} tipo - Tipo de importación
  * @returns {Array} - Datos procesados
  */
-function parseAlmacenes(datos, tipo) {
-  console.log(`Usando parser específico para Almacenes con ${datos.length} registros de tipo ${tipo}`);
-  
-  // Mostrar las primeras filas para depuración
-  console.log('Muestra de datos de Almacenes:', JSON.stringify(datos.slice(0, 2), null, 2));
-  
-  // Mapeo de columnas específicas de ALMCE
-  const columnMap = {
-    codigo: ['__EMPTY_1', 'CÓDIGO', 'CODIGO'],
-    descripcion: ['__EMPTY_2', 'DESCRIPCIÓN', 'DESCRIPCION'],
-    unidades: ['__EMPTY_3', 'UNID.', 'UNID'],
-    importeBruto: ['__EMPTY_4', 'IMPORTE BRUTO'],
-    dto: ['__EMPTY_5', 'DTO'],
-    iva: ['__EMPTY_6', 'IVA 21% + RECARGO 5,2%'],
-    precioConMargen: ['__EMPTY_7', 'PRECIO CON MARGEN 25%'],
-    pvpWeb: ['__EMPTY_8', 'P.V.P     WEB', 'P.V.P WEB'],
-    pvpFinal: ['__EMPTY_9', 'P.V.P FINAL CLIENTE'],
-    vendidas: ['__EMPTY_11', 'VENDIDAS'],
-    stock: ['__EMPTY_12', 'QUEDAN EN TIENDA']
-  };
-  
-  // Función para limpiar valores monetarios
-  const limpiarValorMonetario = (valor) => {
-    if (!valor) return 0;
-    if (typeof valor !== 'string') return parseFloat(valor) || 0;
-    
-    // Eliminar símbolo de euro, espacios y convertir comas a puntos
-    const valorLimpio = valor.replace(/[€\s]/g, '').replace(',', '.');
-    return parseFloat(valorLimpio) || 0;
-  };
-  
-  // Función para obtener valor de una columna usando el mapeo
-  const getColumnValue = (item, columnKeys) => {
-    for (const key of columnKeys) {
-      if (item[key] !== undefined && item[key] !== null && item[key] !== '') {
-        return item[key];
-      }
-    }
-    return null;
-  };
-  
-  // Variables para seguimiento de categorías y subcategorías
-  let categoriaActual = '';
-  let subcategoriaActual = '';
-  
-  // Productos procesados
-  const productosProcesados = [];
-  
-  // Procesar cada fila
-  datos.forEach((item, index) => {
-    // Verificar si es una fila de categoría o subcategoría
-    if (Object.keys(item).length === 1 && item['__EMPTY_1'] && !item['__EMPTY_2']) {
-      // Es una fila de categoría o subcategoría
-      if (item['__EMPTY_1'].length < 15) {
-        categoriaActual = item['__EMPTY_1'].trim();
-        console.log(`Detectada categoría: ${categoriaActual}`);
-      } else {
-        subcategoriaActual = item['__EMPTY_1'].trim();
-        console.log(`Detectada subcategoría: ${subcategoriaActual}`);
-      }
-      return; // Saltar esta fila
-    }
-    
-    // Verificar si es una fila de cabecera
-    if (getColumnValue(item, columnMap.codigo) === 'CÓDIGO' || 
-        getColumnValue(item, columnMap.descripcion) === 'DESCRIPCIÓN') {
-      console.log('Detectada fila de cabecera, saltando...');
-      return; // Saltar esta fila
-    }
-    
-    // Verificar si es una fila vacía
-    const isEmpty = Object.values(item).every(val => !val || val === '-   € ' || val === '  -   € ');
-    if (isEmpty) {
-      console.log('Detectada fila vacía, saltando...');
-      return; // Saltar esta fila
-    }
-    
-    // Obtener valores de las columnas
-    const codigo = getColumnValue(item, columnMap.codigo);
-    
-    // Si no hay código, probablemente no es un producto válido
-    if (!codigo) {
-      console.log(`Fila ${index} sin código, saltando...`);
-      return;
-    }
-    
-    const descripcion = getColumnValue(item, columnMap.descripcion) || '';
-    const unidades = parseInt(getColumnValue(item, columnMap.unidades) || 0, 10);
-    const importeBruto = limpiarValorMonetario(getColumnValue(item, columnMap.importeBruto));
-    const pvpFinal = limpiarValorMonetario(getColumnValue(item, columnMap.pvpFinal));
-    const stockDisponible = parseInt(getColumnValue(item, columnMap.stock) || 0, 10);
-    
-    // Crear objeto de producto normalizado
-    const producto = {
-      codigo: codigo.toString(),
-      nombre: descripcion.toString(),
-      descripcion: descripcion.toString(),
-      precio: pvpFinal > 0 ? pvpFinal : importeBruto,
-      stock: isNaN(stockDisponible) ? unidades : stockDisponible,
-      proveedor: 'ALMACENES',
-      marca: subcategoriaActual || '',
-      categoria: categoriaActual || '',
-      visible: true,
-      destacado: false,
-      datos_origen: item
-    };
-    
-    console.log(`Producto procesado: ${producto.codigo} - ${producto.nombre} - ${producto.precio}€`);
-    productosProcesados.push(producto);
-  });
-  
-  console.log(`Total de productos procesados: ${productosProcesados.length}`);
-  return productosProcesados;
+export function parseAlmacenes(datos, tipo) {
+  return parserGenericoUniversal(datos, tipo);
 }
 
 // Mapeo de proveedores a sus parsers específicos
 export const proveedorParsers = {
+  'ALMCE': parserALMCE,
+  'GENERICO': parserGenericoUniversal,
   'CECOTEC': parseCecotec,
   'BSH': parseBSH,
   'JATA': parseJata,
@@ -448,8 +358,6 @@ export const proveedorParsers = {
   'ALFADYSER': parseAlfadyser,
   'VITROKITCHEN': parseVitrokitchen,
   'ELECTRODIRECTO': parseElectrodirecto,
-  'ALMCE': parseAlmacenes,
   'ALMACENES': parseAlmacenes,
-  'GENERICO': parserGenerico
   // Añadir más parsers según sea necesario
 };

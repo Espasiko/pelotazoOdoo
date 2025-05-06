@@ -137,7 +137,7 @@ export async function importarDatos(filePath, proveedor, tipo, importacionId = n
     await actualizarLog(importacionId, `Detectadas ${categorias.length} categorías`);
     
     // Importar a la base de datos
-    const resultado = await importarABaseDeDatos(datosProcesados, proveedor, importacionId, proveedorId, categorias);
+    const resultado = await importarABaseDeDatos(datosProcesados, proveedor, importacionId, fetchAdmin /*, proveedorId, categorias */);
     console.log(`Importación completada: ${resultado.stats.creados} creados, ${resultado.stats.actualizados} actualizados, ${resultado.stats.errores} errores`);
     await actualizarLog(importacionId, `Importación completada: ${resultado.stats.creados} creados, ${resultado.stats.actualizados} actualizados, ${resultado.stats.errores} errores`);
     
@@ -162,13 +162,21 @@ export async function importarDatos(filePath, proveedor, tipo, importacionId = n
  * @param {Array} datos - Datos procesados a importar
  * @param {string} proveedorNombre - Nombre del proveedor
  * @param {string} importacionId - ID de la importación
- * @param {string} proveedorId - ID del proveedor
- * @param {Array} categorias - Categorías detectadas
+ * @param {function} fetchAdminFunc - Función para realizar llamadas fetch autenticadas como admin.
  * @returns {Promise<Object>} - Resultado de la importación
  */
-async function importarABaseDeDatos(datos, proveedorNombre, importacionId, proveedorId, categorias) {
+async function importarABaseDeDatos(datos, proveedorNombre, importacionId, fetchAdminFunc /* Antiguamente pbClient, pero es fetchAdmin */) {
   console.log(`Importando ${datos.length} productos a la base de datos para proveedor ${proveedorNombre || 'desconocido'}`);
   
+  if (!fetchAdminFunc) { // Verificación del parámetro renombrado
+    console.error('Error Crítico: fetchAdminFunc no proporcionado a importarABaseDeDatos.');
+    return {
+      exito: false,
+      error: 'Función fetchAdmin no configurada para la importación.',
+      stats: { total: datos.length, creados: 0, actualizados: 0, errores: datos.length, erroresDetalle: [{ producto: 'General', error: 'fetchAdmin no configurado' }], devoluciones: 0 }
+    };
+  }
+
   // Variables para estadísticas
   const stats = {
     total: datos.length,
@@ -180,6 +188,19 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, prove
   };
   
   try {
+    // 1. Obtener/Crear ID del PROVEEDOR PRINCIPAL
+    let idProveedorPrincipal = null;
+    if (proveedorNombre) {
+      console.log(`Resolviendo ID para el proveedor principal: ${proveedorNombre}`);
+      idProveedorPrincipal = await obtenerOCrearIdRelacion(proveedorNombre, 'proveedores', fetchAdminFunc);
+      if (!idProveedorPrincipal) {
+        console.warn(`No se pudo resolver o crear el proveedor principal '${proveedorNombre}'. Los productos no se asociarán a un proveedor principal.`);
+        stats.erroresDetalle.push({ producto: 'Configuración General', campo: 'proveedorPrincipal', valor: proveedorNombre, error: 'No se pudo resolver/crear ID del proveedor.' });
+      }
+    } else {
+      console.warn('No se proporcionó nombre de proveedor principal. Los productos no se asociarán a un proveedor principal.');
+    }
+
     // Procesar los datos y crear/actualizar productos
     for (let i = 0; i < datos.length; i++) {
       const item = datos[i];
@@ -193,48 +214,88 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, prove
         
         // Utilidad para normalizar precios y asegurar que nunca falte precio_venta
         function normalizaPrecio(valor, fallback = 0) {
-          if (typeof valor === 'number' && !isNaN(valor)) return valor;
+          if (valor === undefined || valor === null) return fallback;
+          if (typeof valor === 'number') return valor;
           if (typeof valor === 'string') {
-            // Reemplaza comas y símbolos, deja solo números y puntos
-            const limpio = valor.replace(/,/g, '.').replace(/[^0-9.]/g, '');
+            const limpio = valor.replace(/[^\d.,]/g, '').replace(',', '.');
             const num = parseFloat(limpio);
             if (!isNaN(num)) return num;
           }
           return fallback;
         }
 
-        // Crear objeto de producto con los datos mínimos necesarios
-        const precioVentaValido = normalizaPrecio(
-          item.precio_venta ||
-          item.PRECIO_VENTA ||
-          item.PVP ||
-          item.precio ||
-          item.PRECIO ||
-          0
-        );
-        if (precioVentaValido === 0) {
-          console.warn(`Producto con código ${item.codigo || item.CODIGO || item.REFERENCIA || item.REF || 'sin_codigo'}: precio_venta no válido, se asigna 0`);
+        // Añadir log para ver el item completo que viene del parser
+        console.log(`[importarABaseDeDatos] Procesando item ${i}:`, JSON.stringify(item));
+
+        // Validar precio_venta antes de construir el producto
+        // Ahora esperamos que item.precio_venta venga directamente del parser
+        let precioVentaValido = normalizaPrecio(item.precio_venta, 0);
+        // Permitir precio 0 si explícitamente es 0 o "0", pero no si es undefined, null, o texto no numérico
+        if (precioVentaValido <= 0 && item.precio_venta !== 0 && String(item.precio_venta).trim() !== '0') {
+          stats.errores++;
+          // El log de error usará el valor de item.precio_venta tal como llegó
+          stats.erroresDetalle.push({ 
+            producto: item.codigo || `Item ${i}`, 
+            error: `Precio de venta inválido o cero. Valor recibido del parser: '${item.precio_venta}'` 
+          });
+          continue; // Saltar este producto
         }
+
+        // Campos esperados del parser para categoría y marca
+        const nombreCategoriaDetectada = item.categoriaExtraidaDelParser;
+        const marcaDetectada = item.marcaExtraidaDelParser;
+
+        // Crear el objeto base del producto
         const producto = {
-          nombre: item.nombre || item.NOMBRE || item.DESCRIPCION || item.DESC || `Producto ${i}`,
-          codigo: item.codigo || item.CODIGO || item.REFERENCIA || item.REF || item.SKU || item.ID || `REF-${i}`,
-          descripcion: item.descripcion || item.DESCRIPCION || '',
-          precio: normalizaPrecio(item.precio || item.PRECIO || item['P.V.P'] || item['P.V.P FINAL CLIENTE'] || 0),
+          codigo: String(item.codigo || item.CODIGO || item.EAN || item.REFERENCIA || `SIN_CODIGO_${i}`),
+          nombre: String(item.nombre || item.DESCRIPCION || item.CONCEPTO || item.TITULO || 'Sin Nombre'),
+          descripcion: String(item.descripcion_larga || item.DESCRIPCION || ''), // Usar un campo más descriptivo si existe
+          precio_costo: normalizaPrecio(item.precio_costo || item.NETO || 0, 0),
           precio_venta: precioVentaValido,
           iva: normalizaPrecio(item.iva || item.IVA || 21, 21),
           stock: parseInt(item.stock || item.STOCK || item.UNIDADES || item['UNID.'] || '0', 10) || 0,
           activo: true,
           visible: true, // Asegurarnos de que el producto sea visible
+          marca: marcaDetectada || null, // Asignación de marca como texto
           datos_origen: JSON.stringify(item) // Guardar datos originales para referencia
         };
         
-        // Validar que el producto tenga datos mínimos
-        if (!producto.codigo || !producto.nombre) {
-          console.log(`Producto ${i} sin código o nombre válido, saltando...`);
+        // Log del producto base que se va a procesar
+        // console.log(`Producto base (${i}):`, JSON.stringify(producto, null, 2));
+        if (!producto.codigo || producto.codigo.startsWith('SIN_CODIGO_')) {
+          console.log(`Producto ${i} sin código válido, saltando...`);
           continue;
         }
         
         console.log(`Procesando producto ${i}: ${producto.codigo} - ${producto.nombre}`);
+        
+        // ASIGNACIÓN DE CATEGORÍA
+        if (nombreCategoriaDetectada) {
+          console.log(`Intentando resolver ID para categoría: '${nombreCategoriaDetectada}' para producto ${producto.codigo}`);
+          const categoriaIdPocketbase = await obtenerOCrearIdRelacion(nombreCategoriaDetectada, 'categorias', fetchAdminFunc);
+          if (categoriaIdPocketbase) {
+            producto.categoria = categoriaIdPocketbase; // Asignar el ID para la relación
+            console.log(`Categoría ID ${categoriaIdPocketbase} asignada a producto ${producto.codigo}`);
+          } else {
+            stats.erroresDetalle.push({ producto: producto.codigo, campo: 'categoria', valor: nombreCategoriaDetectada, error: `No se pudo resolver/crear ID para categoría.` });
+            console.warn(`No se pudo resolver o crear la categoría '${nombreCategoriaDetectada}' para el producto ${producto.codigo}.`);
+            // No se incrementa stats.errores aquí, se hará si la creación/actualización del producto falla debido a esto (si categoria es obligatoria)
+          }
+        } else {
+          console.log(`No se detectó categoría en el parser para el producto ${producto.codigo}.`);
+          // Opcional: registrar si no hay categoría y se esperaba
+          // stats.erroresDetalle.push({ producto: producto.codigo, campo: 'categoria', error: 'Categoría no detectada por el parser.' });
+        }
+
+        // ASIGNAR PROVEEDOR PRINCIPAL (si se resolvió)
+        if (idProveedorPrincipal) {
+          producto.proveedor = idProveedorPrincipal;
+        } else {
+            // Opcional: registrar si no hay proveedor principal aunque se esperase
+            if(proveedorNombre) { // Si se esperaba un proveedor pero no se resolvió su ID
+                 stats.erroresDetalle.push({ producto: producto.codigo, campo: 'proveedor', valor: proveedorNombre, error: `ID del proveedor principal no resuelto. El producto no se asociará.` });
+            }
+        }
         
         // Verificar si el producto ya existe por su código
         try {
@@ -242,13 +303,13 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, prove
           
           try {
             // Intentar buscar por código exacto
-            const existentesRes = await fetchAdmin(`/api/collections/productos/records?filter=(codigo='${encodeURIComponent(producto.codigo)}')`);
+            const existentesRes = await fetchAdminFunc(`/api/collections/productos/records?filter=(codigo='${encodeURIComponent(producto.codigo)}')`);
             existentes = existentesRes;
           } catch (error) {
             console.error(`Error al buscar producto existente por código exacto: ${error.message}`);
             // Intentar con una búsqueda menos estricta
             try {
-              const existentesRes = await fetchAdmin(`/api/collections/productos/records?filter=(codigo~'${encodeURIComponent(producto.codigo)}')`);
+              const existentesRes = await fetchAdminFunc(`/api/collections/productos/records?filter=(codigo~'${encodeURIComponent(producto.codigo)}')`);
               existentes = existentesRes;
             } catch (error2) {
               console.error(`Error al buscar producto existente por código similar: ${error2.message}`);
@@ -261,7 +322,7 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, prove
             
             try {
               // Obtener el producto existente para preservar los campos obligatorios
-              const productoExistenteRes = await fetchAdmin(`/api/collections/productos/records/${existentes.items[0].id}`);
+              const productoExistenteRes = await fetchAdminFunc(`/api/collections/productos/records/${existentes.items[0].id}`);
               const productoExistente = productoExistenteRes;
               
               console.log(`Datos del producto existente:`, JSON.stringify(productoExistente).substring(0, 200) + '...');
@@ -288,7 +349,7 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, prove
               
               logProductoEnvio('ACTUALIZAR', productoActualizado);
               
-              const productoActualizadoRes = await fetchAdmin(`/api/collections/productos/records/${existentes.items[0].id}`, {
+              const productoActualizadoRes = await fetchAdminFunc(`/api/collections/productos/records/${existentes.items[0].id}`, {
                 method: 'PATCH',
                 headers: {
                   'Content-Type': 'application/json'
@@ -317,7 +378,7 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, prove
                 };
                 logProductoEnvio('ACTUALIZAR', productoActualizadoMinimo);
                 
-                const productoActualizadoMinimoRes = await fetchAdmin(`/api/collections/productos/records/${existentes.items[0].id}`, {
+                const productoActualizadoMinimoRes = await fetchAdminFunc(`/api/collections/productos/records/${existentes.items[0].id}`, {
                   method: 'PATCH',
                   headers: {
                     'Content-Type': 'application/json'
@@ -356,7 +417,7 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, prove
               };
               logProductoEnvio('CREAR', nuevoProducto);
               
-              const nuevoProductoRes = await fetchAdmin(`/api/collections/productos/records`, {
+              const nuevoProductoRes = await fetchAdminFunc(`/api/collections/productos/records`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json'
@@ -391,7 +452,7 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, prove
                 };
                 logProductoEnvio('CREAR', productoMinimo);
                 
-                const nuevoProductoMinimoRes = await fetchAdmin(`/api/collections/productos/records`, {
+                const nuevoProductoMinimoRes = await fetchAdminFunc(`/api/collections/productos/records`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json'
@@ -448,6 +509,62 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, prove
     exito: true,
     stats
   };
+}
+
+// Nueva función auxiliar corregida para usar fetchAdminFunc
+async function obtenerOCrearIdRelacion(nombreEntidad, nombreColeccion, fetchAdminFunc) {
+  if (!fetchAdminFunc) {
+    console.error(`Error Crítico: fetchAdminFunc no proporcionado a obtenerOCrearIdRelacion para ${nombreColeccion} con entidad ${nombreEntidad}`);
+    return null;
+  }
+  if (!nombreEntidad || typeof nombreEntidad !== 'string' || nombreEntidad.trim() === '') {
+    console.log(`Nombre de entidad para ${nombreColeccion} no válido o vacío: '${nombreEntidad}'`);
+    return null;
+  }
+  const nombreNormalizado = nombreEntidad.trim();
+
+  try {
+    console.log(`Buscando en ${nombreColeccion} por nombre: '${nombreNormalizado}' usando fetchAdminFunc`);
+    // Construir el filtro para la URL. Asegúrate que el campo se llame 'nombre'.
+    const filtro = encodeURIComponent(`nombre = "${nombreNormalizado.replace(/"/g, '\"')}"`);
+    const urlBusqueda = `/api/collections/${nombreColeccion}/records?filter=${filtro}`;
+    
+    const records = await fetchAdminFunc(urlBusqueda);
+
+    if (records && records.items && records.items.length > 0) {
+      console.log(`Entidad encontrada en ${nombreColeccion} con ID: ${records.items[0].id}`);
+      return records.items[0].id; // Devolver ID existente
+    } else {
+      console.log(`Creando nueva entidad en ${nombreColeccion}: '${nombreNormalizado}' usando fetchAdminFunc`);
+      const urlCreacion = `/api/collections/${nombreColeccion}/records`;
+      const newRecord = await fetchAdminFunc(urlCreacion, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: nombreNormalizado }),
+      });
+      
+      if (newRecord && newRecord.id) {
+        console.log(`Nueva entidad creada en ${nombreColeccion} con ID: ${newRecord.id}`);
+        return newRecord.id; // Devolver ID del nuevo registro
+      } else {
+        console.error(`No se pudo crear la entidad '${nombreNormalizado}' en ${nombreColeccion}. Respuesta:`, newRecord);
+        return null;
+      }
+    }
+  } catch (error) {
+    console.error(`Error en obtenerOCrearIdRelacion para '${nombreNormalizado}' en '${nombreColeccion}':`, error);
+    // Considerar si el error es un objeto de error de fetch o la respuesta de PocketBase
+    if (error.data && error.data.data) {
+        Object.keys(error.data.data).forEach(key => {
+            if(error.data.data[key] && error.data.data[key].message) {
+                console.error(`Detalle del error de PocketBase (campo ${key}): ${error.data.data[key].message}`);
+            }
+        });
+    } else if (error.message) {
+        console.error("Error general en obtenerOCrearIdRelacion:", error.message);
+    }
+    return null;
+  }
 }
 
 // Exportar funciones principales
