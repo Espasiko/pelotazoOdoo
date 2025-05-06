@@ -5,7 +5,10 @@
 import PocketBase from 'pocketbase';
 
 // Instancia de PocketBase para autenticación
-const pb = new PocketBase('http://127.0.0.1:8090');
+const pb = new PocketBase('http://172.21.181.243:8090');
+
+// URL del servidor de importación
+const IMPORT_SERVER_URL = 'http://localhost:3100';
 
 // Función para obtener el token de autenticación del admin
 const getAuthToken = () => {
@@ -16,6 +19,96 @@ const getAuthToken = () => {
     return parsed.token;
   } catch {
     return null;
+  }
+};
+
+// Función para autenticar como admin
+const autenticarAdmin = async () => {
+  try {
+    // Verificar si tenemos un token guardado
+    const token = getAuthToken();
+    if (token) {
+      // Verificar si el token es válido haciendo una petición de prueba
+      try {
+        const response = await fetch(`http://172.21.181.243:8090/api/collections`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          console.log('Ya estamos autenticados con token guardado');
+          return token;
+        }
+      } catch (tokenError) {
+        console.error('Error al usar token guardado:', tokenError);
+      }
+    }
+    
+    // Si no hay token válido, intentar autenticar directamente
+    try {
+      console.log('Intentando autenticar como admin directamente...');
+      const adminEmail = 'yo@mail.com';
+      const adminPassword = 'Ninami12$ya';
+      
+      // Intentar autenticar con la API de admins
+      const response = await fetch(`http://172.21.181.243:8090/api/admins/auth-with-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          identity: adminEmail,
+          password: adminPassword
+        })
+      });
+      
+      if (!response.ok) {
+        // Si falla, intentar con la colección _superusers
+        const superUserResponse = await fetch(`http://172.21.181.243:8090/api/collections/_superusers/auth-with-password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            identity: adminEmail,
+            password: adminPassword
+          })
+        });
+        
+        if (!superUserResponse.ok) {
+          throw new Error(`Error de autenticación: ${superUserResponse.status}`);
+        }
+        
+        const authData = await superUserResponse.json();
+        console.log('Autenticación directa exitosa como superuser:', authData);
+        
+        // Guardar en localStorage
+        localStorage.setItem('pelotazo_auth', JSON.stringify({
+          token: authData.token,
+          model: authData.record,
+        }));
+        
+        return authData.token;
+      } else {
+        const authData = await response.json();
+        console.log('Autenticación directa exitosa como admin:', authData);
+        
+        // Guardar en localStorage
+        localStorage.setItem('pelotazo_auth', JSON.stringify({
+          token: authData.token,
+          model: authData.record,
+        }));
+        
+        return authData.token;
+      }
+    } catch (authError) {
+      console.error('Error al autenticar directamente:', authError);
+      throw authError;
+    }
+  } catch (error) {
+    console.error('Error al autenticar con PocketBase:', error);
+    throw error;
   }
 };
 
@@ -31,7 +124,7 @@ export const subirArchivoImportacion = async (file, proveedor, tipo) => {
     console.log(`Iniciando importación de ${tipo} desde ${proveedor}...`);
     
     // Obtener token de autenticación del admin
-    const token = getAuthToken();
+    const token = await autenticarAdmin();
     if (!token) throw new Error('No hay sesión válida de PocketBase (admin)');
     
     const formData = new FormData();
@@ -43,7 +136,7 @@ export const subirArchivoImportacion = async (file, proveedor, tipo) => {
     formData.append('log', 'Iniciando importación...');
 
     // Usar el endpoint del backend para subir el archivo
-    const response = await fetch('http://127.0.0.1:3100/api/importar', {
+    const response = await fetch(`${IMPORT_SERVER_URL}/api/importar`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`
@@ -99,11 +192,11 @@ export const subirArchivoImportacion = async (file, proveedor, tipo) => {
 export const obtenerHistorialImportaciones = async () => {
   try {
     // Obtener token de autenticación del admin
-    const token = getAuthToken();
+    const token = await autenticarAdmin();
     if (!token) throw new Error('No hay sesión válida de PocketBase (admin)');
     
     // Usar el endpoint del backend para obtener el historial
-    const response = await fetch('http://127.0.0.1:3100/api/importaciones', {
+    const response = await fetch(`${IMPORT_SERVER_URL}/api/importaciones`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -148,11 +241,11 @@ export const obtenerHistorialImportaciones = async () => {
 export const obtenerEstadoImportacion = async (importacionId) => {
   try {
     // Obtener token de autenticación del admin
-    const token = getAuthToken();
+    const token = await autenticarAdmin();
     if (!token) throw new Error('No hay sesión válida de PocketBase (admin)');
     
     // Usar el endpoint del backend para obtener el estado
-    const response = await fetch(`http://127.0.0.1:3100/api/importaciones/${importacionId}`, {
+    const response = await fetch(`${IMPORT_SERVER_URL}/api/importaciones/${importacionId}`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }

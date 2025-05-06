@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import PocketBase from 'pocketbase';
 import { Box, Button, TextField, Typography, Paper } from '@mui/material';
 
 // Instancia de PocketBase para autenticación
-const pb = new PocketBase('http://127.0.0.1:8090');
+const pbUrl = 'http://172.21.181.243:8090';
 
 const AdminLogin = () => {
   const [email, setEmail] = useState('admin@example.com'); // Email por defecto
@@ -16,14 +15,51 @@ const AdminLogin = () => {
     e.preventDefault();
     setError('');
     try {
-      // Autenticación como admin (no como usuario de colección)
-      const authData = await pb.admins.authWithPassword(email, password);
-      console.log('Login exitoso como admin:', authData);
-      
-      localStorage.setItem('pelotazo_auth', JSON.stringify({
-        token: pb.authStore.token,
-        model: pb.authStore.model,
-      }));
+      // Autenticación directa con fetch en lugar de usar el SDK
+      const response = await fetch(`${pbUrl}/api/admins/auth-with-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          identity: email,
+          password: password
+        })
+      });
+
+      if (!response.ok) {
+        // Si la primera autenticación falla, intentar con la colección _superusers
+        const superUserResponse = await fetch(`${pbUrl}/api/collections/_superusers/auth-with-password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            identity: email,
+            password: password
+          })
+        });
+
+        if (!superUserResponse.ok) {
+          throw new Error(`Error de autenticación: ${superUserResponse.status}`);
+        }
+
+        const authData = await superUserResponse.json();
+        console.log('Login exitoso como superuser:', authData);
+        
+        localStorage.setItem('pelotazo_auth', JSON.stringify({
+          token: authData.token,
+          model: authData.record,
+        }));
+      } else {
+        const authData = await response.json();
+        console.log('Login exitoso como admin:', authData);
+        
+        localStorage.setItem('pelotazo_auth', JSON.stringify({
+          token: authData.token,
+          model: authData.record,
+        }));
+      }
       
       // Forzar reload para que la app detecte el nuevo estado
       window.location.reload();

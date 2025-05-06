@@ -1,10 +1,11 @@
 // Importar PocketBase
 import PocketBase from 'pocketbase';
 
-// Inicializar PocketBase con autoCancel en false para evitar cancelaciones
-const pb = new PocketBase('http://127.0.0.1:8090', { 
-  autoCancel: false 
-});
+// URL base de PocketBase
+const pbUrl = 'http://172.21.181.243:8090';
+
+// Variable para almacenar el token de autenticación
+let authToken = null;
 
 // Función para obtener el token de autenticación del admin
 const getAuthToken = () => {
@@ -24,28 +25,132 @@ async function autenticarAdmin() {
     // Verificar si tenemos un token guardado
     const token = getAuthToken();
     if (token) {
+      // Verificar si el token es válido haciendo una petición de prueba
       try {
-        // Intentar usar el token existente
-        pb.authStore.save(token);
-        // Verificar si el token es válido
-        if (pb.authStore.isValid) {
+        const response = await fetch(`${pbUrl}/api/collections`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
           console.log('Ya estamos autenticados con token guardado');
+          authToken = token;
           return true;
         }
       } catch (tokenError) {
         console.error('Error al usar token guardado:', tokenError);
-        // Si hay error con el token, limpiamos y continuamos
-        pb.authStore.clear();
+        // Si hay error con el token, continuamos con la autenticación directa
       }
     }
     
-    // Si no hay token válido, mostrar mensaje de error
-    console.error('No hay sesión válida de admin. Por favor inicia sesión.');
-    return false;
+    // Si no hay token válido, intentar autenticar directamente
+    try {
+      console.log('Intentando autenticar como admin directamente...');
+      const adminEmail = 'yo@mail.com';
+      const adminPassword = 'Ninami12$ya';
+      
+      // Intentar autenticar con la API de admins
+      const response = await fetch(`${pbUrl}/api/admins/auth-with-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          identity: adminEmail,
+          password: adminPassword
+        })
+      });
+      
+      if (!response.ok) {
+        // Si falla, intentar con la colección _superusers
+        const superUserResponse = await fetch(`${pbUrl}/api/collections/_superusers/auth-with-password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            identity: adminEmail,
+            password: adminPassword
+          })
+        });
+        
+        if (!superUserResponse.ok) {
+          throw new Error(`Error de autenticación: ${superUserResponse.status}`);
+        }
+        
+        const authData = await superUserResponse.json();
+        console.log('Autenticación directa exitosa como superuser:', authData);
+        
+        // Guardar el token para futuras peticiones
+        authToken = authData.token;
+        
+        // Guardar en localStorage
+        localStorage.setItem('pelotazo_auth', JSON.stringify({
+          token: authData.token,
+          model: authData.record,
+        }));
+        
+        return true;
+      } else {
+        const authData = await response.json();
+        console.log('Autenticación directa exitosa como admin:', authData);
+        
+        // Guardar el token para futuras peticiones
+        authToken = authData.token;
+        
+        // Guardar en localStorage
+        localStorage.setItem('pelotazo_auth', JSON.stringify({
+          token: authData.token,
+          model: authData.record,
+        }));
+        
+        return true;
+      }
+    } catch (authError) {
+      console.error('Error al autenticar directamente:', authError);
+      return false;
+    }
   } catch (error) {
     console.error('Error al autenticar con PocketBase:', error);
     return false;
   }
+}
+
+// Función para realizar peticiones autenticadas a PocketBase
+async function fetchAdmin(endpoint, options = {}) {
+  const token = authToken || await getAuthToken();
+  if (!token) {
+    const autenticado = await autenticarAdmin();
+    if (!autenticado) {
+      throw new Error('No se pudo autenticar como administrador');
+    }
+  }
+  
+  const defaultOptions = {
+    headers: {
+      'Authorization': `Bearer ${authToken}`,
+      'Content-Type': 'application/json'
+    }
+  };
+  
+  const fetchOptions = {
+    ...defaultOptions,
+    ...options,
+    headers: {
+      ...defaultOptions.headers,
+      ...options.headers
+    }
+  };
+  
+  const url = endpoint.startsWith('http') ? endpoint : `${pbUrl}${endpoint}`;
+  const response = await fetch(url, fetchOptions);
+  
+  if (!response.ok) {
+    throw new Error(`Error en petición: ${response.status}`);
+  }
+  
+  return await response.json();
 }
 
 // Mapeo de operadores de filtro de Refine a PocketBase
@@ -109,9 +214,6 @@ const generateFilter = (filters) => {
 export const dataProvider = {
   getList: async ({ resource, pagination, filters, sorters }) => {
     try {
-      // Intentar autenticar antes de cada operación
-      await autenticarAdmin();
-      
       const { current = 1, pageSize = 10 } = pagination || {};
       
       // Generar filtro
@@ -130,14 +232,11 @@ export const dataProvider = {
       }
       
       // Realizar la petición a PocketBase
-      const result = await pb.collection(resource).getList(current, pageSize, {
-        filter: filterStr,
-        sort: sortStr,
-      });
+      const response = await fetchAdmin(`/api/collections/${resource}?page=${current}&perPage=${pageSize}${filterStr ? `&filter=${filterStr}` : ''}${sortStr ? `&sort=${sortStr}` : ''}`);
       
       return {
-        data: result.items,
-        total: result.totalItems,
+        data: response.items,
+        total: response.totalItems,
       };
     } catch (error) {
       console.error('Error en getList:', error);
@@ -147,15 +246,11 @@ export const dataProvider = {
   
   getMany: async ({ resource, ids }) => {
     try {
-      await autenticarAdmin();
-      
       const filterStr = `id?~ "${ids.join('||')}"`;
-      const result = await pb.collection(resource).getList(1, 100, {
-        filter: filterStr,
-      });
+      const response = await fetchAdmin(`/api/collections/${resource}?page=1&perPage=100&filter=${filterStr}`);
       
       return {
-        data: result.items,
+        data: response.items,
       };
     } catch (error) {
       console.error('Error en getMany:', error);
@@ -165,9 +260,7 @@ export const dataProvider = {
   
   getOne: async ({ resource, id }) => {
     try {
-      await autenticarAdmin();
-      
-      const record = await pb.collection(resource).getOne(id);
+      const record = await fetchAdmin(`/api/collections/${resource}/records/${id}`);
       
       return {
         data: record,
@@ -180,9 +273,10 @@ export const dataProvider = {
   
   create: async ({ resource, variables }) => {
     try {
-      await autenticarAdmin();
-      
-      const record = await pb.collection(resource).create(variables);
+      const record = await fetchAdmin(`/api/collections/${resource}/records`, {
+        method: 'POST',
+        body: JSON.stringify(variables),
+      });
       
       return {
         data: record,
@@ -195,9 +289,10 @@ export const dataProvider = {
   
   update: async ({ resource, id, variables }) => {
     try {
-      await autenticarAdmin();
-      
-      const record = await pb.collection(resource).update(id, variables);
+      const record = await fetchAdmin(`/api/collections/${resource}/records/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(variables),
+      });
       
       return {
         data: record,
@@ -210,9 +305,9 @@ export const dataProvider = {
   
   deleteOne: async ({ resource, id }) => {
     try {
-      await autenticarAdmin();
-      
-      await pb.collection(resource).delete(id);
+      await fetchAdmin(`/api/collections/${resource}/records/${id}`, {
+        method: 'DELETE',
+      });
       
       return {
         data: { id },
@@ -224,13 +319,12 @@ export const dataProvider = {
   },
   
   getApiUrl: () => {
-    return `${pb.baseUrl}/api`;
+    return `${pbUrl}/api`;
   },
   
   custom: async ({ url, method, filters, sorters, payload, query, headers }) => {
     try {
-      await autenticarAdmin();
-      
+      // Construir la URL completa
       const config = {
         method: method || 'GET',
         url: url || '',
@@ -255,7 +349,7 @@ export const dataProvider = {
       }
       
       // Realizar la petición personalizada
-      const response = await pb.send(config.url, config);
+      const response = await fetchAdmin(config.url, config);
       
       return {
         data: response,

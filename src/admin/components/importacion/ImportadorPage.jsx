@@ -41,11 +41,11 @@ const FileSelector = ({ onFileSelect }) => {
     const file = event.target.files[0];
     if (file) {
       // Verificar extensión del archivo
-      const validExtensions = ['.csv', '.xlsx', '.xls'];
+      const validExtensions = ['.csv', '.xlsx', '.xls', '.json'];
       const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
       
       if (!validExtensions.includes(fileExtension)) {
-        setError('Formato de archivo no válido. Por favor, selecciona un archivo CSV o Excel.');
+        setError('Formato de archivo no válido. Por favor, selecciona un archivo CSV, Excel o JSON.');
         setSelectedFile(null);
         return;
       }
@@ -64,7 +64,7 @@ const FileSelector = ({ onFileSelect }) => {
       
       <Box sx={{ mt: 2 }}>
         <input
-          accept=".csv,.xlsx,.xls"
+          accept=".csv,.xlsx,.xls,.json"
           style={{ display: 'none' }}
           id="file-upload"
           type="file"

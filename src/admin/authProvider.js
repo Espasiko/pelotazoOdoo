@@ -1,7 +1,7 @@
 import PocketBase from 'pocketbase';
 
 // Inicializar PocketBase
-const pb = new PocketBase('http://localhost:8095');
+const pb = new PocketBase('http://172.21.181.243:8090');
 
 export const authProvider = {
   login: async ({ email, password }) => {

@@ -51,19 +51,22 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ 
-  storage: storage,
-  fileFilter(req, file, cb) {
-    // Verificar extensiones permitidas
-    const extensionesPermitidas = ['.csv', '.xlsx', '.xls'];
-    const ext = path.extname(file.originalname).toLowerCase();
-    
-    if (extensionesPermitidas.includes(ext)) {
-      cb(null, true);
-    } else {
-      cb(new Error(`Formato de archivo no soportado. Use: ${extensionesPermitidas.join(', ')}`));
-    }
+// Filtro para archivos permitidos
+const fileFilter = (req, file, cb) => {
+  // Verificar extensión del archivo
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (ext === '.csv' || ext === '.xlsx' || ext === '.xls' || ext === '.json') {
+    cb(null, true);
+  } else {
+    cb(new Error('Formato de archivo no soportado. Solo se permiten archivos CSV, Excel y JSON.'), false);
   }
+};
+
+// Configurar multer
+const upload = multer({ 
+  storage,
+  fileFilter,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB máximo
 });
 
 // Middleware para verificar autenticación

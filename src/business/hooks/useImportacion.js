@@ -30,6 +30,8 @@ export const useImportacion = () => {
     { id: 'ALFADYSER', nombre: 'ALFADYSER' },
     { id: 'VITROKITCHEN', nombre: 'VITROKITCHEN' },
     { id: 'ELECTRODIRECTO', nombre: 'ELECTRODIRECTO' },
+    { id: 'ALMCE', nombre: 'ALMACENES' },
+    { id: 'ALMACENES', nombre: 'ALMACENES (Alternativo)' },
     { id: 'GENERICO', nombre: 'Genérico (Otros proveedores)' }
   ];
 
@@ -113,12 +115,24 @@ export const useImportacion = () => {
       }
       
       // Subir archivo y registrar importación
-      const importacion = await subirArchivoImportacion(file, proveedor, tipo);
+      const respuesta = await subirArchivoImportacion(file, proveedor, tipo);
       
-      // Validar que la respuesta tenga un ID válido
+      // Validar que la respuesta tenga un formato válido
+      if (!respuesta) {
+        setError('Error: No se recibió respuesta del servidor');
+        console.error('No se recibió respuesta del servidor');
+        setLoading(false);
+        return null;
+      }
+      
+      // Extraer la información de importación de la respuesta
+      // La respuesta puede tener formato {importacion: {...}} o ser directamente el objeto importacion
+      const importacion = respuesta.importacion || respuesta;
+      
+      // Validar que la importación tenga un ID válido
       if (!importacion || !importacion.id) {
         setError('Error: No se pudo obtener el ID de la importación');
-        console.error('Respuesta de importación inválida:', importacion);
+        console.error('Respuesta de importación inválida:', respuesta);
         setLoading(false);
         return null;
       }
