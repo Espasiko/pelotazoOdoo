@@ -216,3 +216,101 @@ export async function registrarDevolucion(producto, analisisNota, proveedorId, i
     return null;
   }
 }
+
+/**
+ * Importa (crea) un producto en PocketBase
+ * @param {Object} productoData - Datos del producto a importar
+ * @param {Function} fetchAdminFunc - Función para realizar la llamada API a PocketBase
+ * @returns {Promise<Object>} - Producto creado
+ */
+export async function importarProducto(productoData, fetchAdminFunc) {
+  try {
+    const response = await fetchAdminFunc('/api/collections/productos/records', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(productoData)
+    });
+    console.log(`Producto creado con ID: ${response.id}`);
+    return response;
+  } catch (error) {
+    console.error('Error al importar producto:', error);
+    throw error;
+  }
+}
+
+/**
+ * Actualiza un producto en PocketBase
+ * @param {string} productoId - ID del producto a actualizar
+ * @param {Object} productoData - Datos del producto a actualizar
+ * @param {Function} fetchAdminFunc - Función para realizar la llamada API a PocketBase
+ * @returns {Promise<Object>} - Producto actualizado
+ */
+export async function actualizarProducto(productoId, productoData, fetchAdminFunc) {
+  try {
+    const response = await fetchAdminFunc(`/api/collections/productos/records/${productoId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(productoData)
+    });
+    console.log(`Producto actualizado con ID: ${response.id}`);
+    return response;
+  } catch (error) {
+    console.error('Error al actualizar producto:', error);
+    throw error;
+  }
+}
+
+/**
+ * Obtiene el ID de una categoría por su nombre
+ * @param {string} nombreCategoria - Nombre de la categoría
+ * @param {Function} fetchAdminFunc - Función para realizar la llamada API a PocketBase
+ * @returns {Promise<string|null>} - ID de la categoría o null si no existe
+ */
+export async function obtenerIdCategoria(nombreCategoria, fetchAdminFunc) {
+  if (!fetchAdminFunc) {
+    console.error(`Error Crítico: fetchAdminFunc no proporcionado a obtenerIdCategoria para ${nombreCategoria}`);
+    return null;
+  }
+  if (!nombreCategoria || typeof nombreCategoria !== 'string' || nombreCategoria.trim() === '') {
+    console.log(`Nombre de categoría no válido o vacío: '${nombreCategoria}'`);
+    return null;
+  }
+  const nombreNormalizado = nombreCategoria.trim();
+  try {
+    console.log(`Buscando en categorías por nombre: '${nombreNormalizado}' usando fetchAdminFunc`);
+    const filtro = encodeURIComponent(`nombre = "${nombreNormalizado.replace(/"/g, '\"')}" `);
+    const urlBusqueda = `/api/collections/categorias/records?filter=${filtro}`;
+    const records = await fetchAdminFunc(urlBusqueda);
+    if (records && records.items && records.items.length > 0) {
+      console.log(`Categoría encontrada con ID: ${records.items[0].id}`);
+      return records.items[0].id;
+    } else {
+      console.log(`Creando nueva categoría: '${nombreNormalizado}' usando fetchAdminFunc`);
+      const urlCreacion = `/api/collections/categorias/records`;
+      const newRecord = await fetchAdminFunc(urlCreacion, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: nombreNormalizado })
+      });
+      if (newRecord && newRecord.id) {
+        console.log(`Nueva categoría creada con ID: ${newRecord.id}`);
+        return newRecord.id;
+      } else {
+        console.error(`No se pudo crear la categoría '${nombreNormalizado}'. Respuesta:`, newRecord);
+        return null;
+      }
+    }
+  } catch (error) {
+    console.error(`Error en obtenerIdCategoria para '${nombreNormalizado}':`, error);
+    if (error.data && error.data.data) {
+      Object.keys(error.data.data).forEach(key => {
+        if (error.data.data[key] && error.data.data[key].message) {
+          console.error(`Detalle del error de PocketBase (campo ${key}): ${error.data.data[key].message}`);
+        }
+      });
+    } else if (error.message) {
+      console.error('Error general en obtenerIdCategoria:', error.message);
+    }
+    return null;
+  }
+}

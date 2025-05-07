@@ -3,6 +3,8 @@
  * Este módulo contiene funciones específicas para procesar datos de diferentes proveedores
  */
 
+import { limpiarPrecio } from './utils.js';
+
 /**
  * Parser genérico universal adaptable por mapeo de columnas
  * Mejorado: incluye heurística para variantes de nombres de columnas y logs de depuración.
@@ -123,9 +125,6 @@ export function parserGenericoUniversal(datos, tipo, config = {}) {
     return { productos: [], categorias: [] };
   }
 
-  // Función para limpiar precios
-  const limpiarPrecio = v => parseFloat((v || '').toString().replace(/[^0-9,\.]/g, '').replace(',', '.')) || 0;
-
   // Procesar filas
   let categoriaActual = null;
   const productos = [];
@@ -193,21 +192,13 @@ export function parserGenericoUniversal(datos, tipo, config = {}) {
     console.log(`[parserGenericoUniversal] Debug PVP - Mapeo colPVP: ${colPVP}`);
     
     // Obtener precio de venta (con fallbacks)
-    let precioVentaCrudo;
-    if (colPVP) {
-      precioVentaCrudo = row[colPVP];
-    } else if (colPrecio) {
-      // Si no hay colPVP, usar colPrecio con un markup del 30%
-      const precioCosto = parseFloat(row[colPrecio] || 0);
-      precioVentaCrudo = precioCosto * 1.3; // 30% de markup
-    } else {
-      precioVentaCrudo = undefined;
+    let precioVentaCrudo = row[colPVP] || row[colPrecio] || '0';
+    let precioVenta = limpiarPrecio(precioVentaCrudo);
+    if (isNaN(precioVenta) || precioVenta <= 0) {
+      console.warn(`[parserGenericoUniversal] Precio inválido en fila ${i}: valor crudo '${precioVentaCrudo}', skipped.`);
+      continue; // Saltar fila con precio inválido
     }
-    
-    console.log(`[parserGenericoUniversal] Debug PVP - Valor crudo para PVP: ${precioVentaCrudo}`);
-    
-    const precioVentaLimpio = limpiarPrecio(precioVentaCrudo);
-    console.log(`[parserGenericoUniversal] Debug PVP - Valor PVP después de limpiarPrecio: ${precioVentaLimpio}`);
+    console.log(`[parserGenericoUniversal] Debug PVP - Valor PVP después de limpiarPrecio: ${precioVenta}`);
 
     // EXTRAER MARCA
     let marcaExtraida = null;
@@ -253,7 +244,7 @@ export function parserGenericoUniversal(datos, tipo, config = {}) {
       
       // Campos financieros - preservar valores originales
       precio_compra: limpiarPrecio(row[colPrecio]),
-      precio_venta: precioVentaLimpio,
+      precio_venta: precioVenta,
       
       // Intentar extraer campos adicionales
       descuento: colDescuento ? limpiarPrecio(row[colDescuento]) : undefined,
@@ -440,8 +431,30 @@ export function parseBSH(datos, tipo) {
  * @returns {Object} - Datos procesados y normalizados con categorías detectadas
  */
 export function parseJata(datos, tipo) {
-  return parserGenericoUniversal(datos, tipo);
+  // Usar el parser genérico pero con validación extra de precio_venta
+  const resultado = parserGenericoUniversal(datos, tipo);
+  const productosValidos = [];
+  const productosOmitidos = [];
+
+  for (const producto of resultado.productos) {
+    const precioValido = limpiarPrecio(producto.precio_venta);
+    if (precioValido === null) {
+      console.warn(`[parseJata] Producto omitido por precio_venta inválido: código=${producto.codigo}, nombre=${producto.nombre}, precio_venta=${producto.precio_venta}`);
+      productosOmitidos.push(producto);
+      continue;
+    }
+    producto.precio_venta = precioValido;
+    productosValidos.push(producto);
+  }
+  if (productosOmitidos.length > 0) {
+    console.warn(`[parseJata] Total productos omitidos por precio_venta inválido: ${productosOmitidos.length}`);
+  }
+  return {
+    ...resultado,
+    productos: productosValidos
+  };
 }
+
 
 /**
  * Parser específico para Orbegozo

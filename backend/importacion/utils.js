@@ -8,6 +8,19 @@ import fetch from 'node-fetch';
 // URL base de PocketBase
 const baseUrl = pocketbaseConfig.url;
 
+/**
+ * Limpia y valida un precio. Devuelve un número válido o null si es inválido o <= 0.
+ * @param {any} v - Valor a limpiar
+ * @returns {number|null}
+ */
+export function limpiarPrecio(v) {
+  if (v === undefined || v === null) return null;
+  const n = parseFloat((v + '').replace(/[^0-9,\.]/g, '').replace(',', '.'));
+  if (isNaN(n) || n <= 0) return null;
+  return n;
+}
+
+
 // Variables globales para almacenar la información de autenticación
 let authToken = null;
 let adminData = null;
