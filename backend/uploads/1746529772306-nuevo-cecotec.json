@@ -1,0 +1,505 @@
+{
+  "provider": "CECOTEC",
+  "items": [
+    {
+      "marca": "CECOTEC",
+      "codigo": "01951",
+      "descripcion": "FRIGORÍFICO PUERTA FRANCESA BOLERO COOLMARKET FD 436 INOX E"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "02437",
+      "descripcion": "AMERICANO BOLERO COOL MARKET SBS 430 BLANCO"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "08380",
+      "descripcion": "ASPIRADOR CONGA ROCKSTAR MICRO ESSENTIAL"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "08058",
+      "descripcion": "ASPIRADOR LIMPIACRISTALES"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "04236",
+      "descripcion": "BASCULA DE COCINA DIGITAL COOK CONTROL"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "04265",
+      "descripcion": "SURFACE PRECISION 10600 SMART HEALTHY PRO DARK GREY"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03938",
+      "descripcion": "BATIDORA MANO POWER retro azul 1200w"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03939",
+      "descripcion": "BATIDORA MANO POWER retro rojo 1200w"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03945",
+      "descripcion": "BATIDORA MANO POWER retro verde 1200w"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03909",
+      "descripcion": "BATIDORA MANO POWER PULSAR 2300W"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03965",
+      "descripcion": "BATIDORA MANO KATANA 12 JAR G"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03975",
+      "descripcion": "BATIDORA MANO KATANA 1500W CHOP"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03883",
+      "descripcion": "BATIDORA VASO POWER BLACK TITANIUM - RETRO AZUL"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03935",
+      "descripcion": "BATIDORA VASO RETRO ROJO"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03987",
+      "descripcion": "BATIDORA VASO POWER TITANIUM 500 EASYGO"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "04310",
+      "descripcion": "BATIDORA VASO 2500W - BOTELLA REGALO"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01621",
+      "descripcion": "CAFETERA ITALIANA INDUCCION 4T"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01669",
+      "descripcion": "CAFETERA ITALIANA ALUMINIO 12TAZAS - "
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "00274",
+      "descripcion": "CAFETERA 66 DROP&THERMO TIME"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01595",
+      "descripcion": "CAFETERA EXPRESSO CUMBIA CAPRICCIOSA BLANCA"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01723",
+      "descripcion": "CAFETERA POWER EXPRESSO 20 RETRO VERDE"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01585",
+      "descripcion": "CAFETERA EXPRESSO VINTAGE BEIGE"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01651",
+      "descripcion": "CAFETERA EXPRESSO CAFELIZZIA 790 NEGRO"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01727",
+      "descripcion": "CAFETERA VINTAGE ROJO"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01629",
+      "descripcion": "CAFETERA VINTAGE AMARILLA"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01557",
+      "descripcion": "CAFETERA SEMIAUTOMATICA POWER-INSTANT SERIE BIANCA"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "08268",
+      "descripcion": "CHIMENEA ELÉCTRICA READYWARM 2000 FLAMES"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "04334",
+      "descripcion": "DEPILADORA BAMBA SKINCARE DEPIL-ACTION"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "04443",
+      "descripcion": "AFEITADORA DE CABEZA"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "04194",
+      "descripcion": "MULTIGROMING 10EN1 - TWISTGROOM CORTAPELOS"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03351",
+      "descripcion": "EXPRIMIDOR ZITRA STEEL"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03899",
+      "descripcion": "EXPRIMIDOR BRAZO ROJO XQUEEZE RETROJUICE 600"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03892",
+      "descripcion": "EXPRIMIDOR ESSENTIAL HYDEN 120"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03951",
+      "descripcion": "EXPRIMIDOR TOWERADJUST EASY STEEL"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03291",
+      "descripcion": "150 PIEZAS DE PAPEL FREIDORA AIRE DE 5 A 6,5L"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03341",
+      "descripcion": "ACCESORIOS FREIDORA AIRE"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "04965",
+      "descripcion": "FREIDORA AIRE - CECOFRY FANTASTIK VENTANA - 5,5L"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03292",
+      "descripcion": "FREIDORA AIRE - CECOFRY DUOHEAT 6L"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "02157",
+      "descripcion": "FRIGORÍFICO BOLERO 1 PUERTA 85CM NEGRO (114L)"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "02674",
+      "descripcion": "FRIGORÍFICO BOLERO 1 PUERTA 85CM INOX"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01899",
+      "descripcion": "FRIGORÍFICO BOLERO 2P. ORIGEN 86 - GREEN E"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "08022",
+      "descripcion": "CREPERA FUN CREPELICIOUS"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "08018",
+      "descripcion": "FONDUE ELECTRICA CHOCOLATE"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03200",
+      "descripcion": "GOFRERA - SANDWICHERA ROCK TOAST FAMILY "
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03261",
+      "descripcion": "PALOMITERO FUN&TASTEP´CORN"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "04861",
+      "descripcion": "PALOMITERO FUN&TASTEP´CORN lotus"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "70020",
+      "descripcion": "PISTOLA SILICONA"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "02685",
+      "descripcion": "FRIGORÍFICO BOLERO HABANA NEGRO 4L"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "02689",
+      "descripcion": "FRIGORÍFICO BOLERO HABANA NEGRO 4L"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "02695",
+      "descripcion": "FRIGORÍFICO BAMBA BLANCO 6L"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "04441",
+      "descripcion": "FRIGORÍFICO BAMBA ESPEJO 6L"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "02774",
+      "descripcion": "LAVAVAJILLAS BOLERO AGUAZERO 6200 NEGRO \"D\" "
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01704",
+      "descripcion": "MICROONDAS 20L 3010 PROCLEAN, RETRO CREMA"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01706",
+      "descripcion": "MICROONDAS 20L GRILL, 3110, RETRO AZUL"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01711",
+      "descripcion": "MICROONDAS 20L GRILL, 5110, digital RETRO AZUL "
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01713",
+      "descripcion": "MICROONDAS 20L GRILL, PROCLEAN, RETRO AMARILLO"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01713",
+      "descripcion": "MICROONDAS 20L GRILL, PROCLEAN, RETRO AMARILLO"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "A01_EU01_100518",
+      "descripcion": "MICROONDAS 20L PROCLEAN 3120 - INOX ESPEJO SIN PLATO"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01399",
+      "descripcion": "MICROONDAS SIN PLATO GRANDHEAT 2010 FLATBED STEEL"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01405",
+      "descripcion": "MICROONDAS 25L SIN PLATO GRANDHEAT 2500-NEGRO"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01359",
+      "descripcion": "MICROONDAS 23L SIN PLATO GRANDHEAT 2300 - BLANCO"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01537",
+      "descripcion": "Microondas digital de 23 litros - PROCLEAN 6110"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "A01_EU01_100513",
+      "descripcion": "MICROONDAS 20L PROCLEAN 3030 - NEGRO SIN PLATO"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "A01_EU01_100516",
+      "descripcion": "MICROONDAS 20L PROCLEAN 3120 - BLANCO SIN PLATO"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "A01_EU01_101130",
+      "descripcion": "MICROONDAS 20L CON GRILL - 700W - AZUL"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "A01_EU01_101132",
+      "descripcion": "MICROONDAS 20L CON GRILL - 700W - VERDE"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03811",
+      "descripcion": "HORNO SOBREMESA 10L BLANCO"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03812",
+      "descripcion": "HORNO SOBREMESA 23L BLANCO BAKE&TOAST"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03813",
+      "descripcion": "HORNO SOBREMESA 26L BLANCO (4PIZZA)"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03814",
+      "descripcion": "HORNO SOBREMESA 30L BLANCO"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03069",
+      "descripcion": "PLACA DE INDUCCIÓN PORTATIL FULL RYSTAL ONYX"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03088",
+      "descripcion": "PLANCHA DE ASAR TASTY&GRILL 3000"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "05543",
+      "descripcion": "PLANCHA VERTICAL (FAST&FURIOUS) 4010 VITAL"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01866",
+      "descripcion": "CENTRO PLANCHADO VERTICAL"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01872",
+      "descripcion": "PLANCHA ROPA IRONHERO3200 FORCE"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "05535",
+      "descripcion": "CENTRO PLANCHADO-Fast&Furious 8040 Absolute "
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03130",
+      "descripcion": "SET SARTENES POLKA 18-22-26 (ROSA)"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03130",
+      "descripcion": "SET SARTENES POLKA 18-22-26 (AMARILLO)"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03167",
+      "descripcion": "1 SARTEN POLKA 18 (NEGRO MANGO TURQUESA)"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "00664",
+      "descripcion": "PLANCHA PELO RITUAL CARE TWERK"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "00267",
+      "descripcion": "HERVIDOR DE AGUA ELECTRICO WOODY 200 RETRO NEGRO"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01485",
+      "descripcion": "HERVIDOR THERMOSENSE VINTAGE - BEIGE"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01483",
+      "descripcion": "HERVIDOR THERMOSENSE VINTAGE - VERDE"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03179",
+      "descripcion": "TOSTADOR 9000 DOBLE NEGRO"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03105",
+      "descripcion": "TOSTADOR 8000 DOBLE RETRO BLUE"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "08210",
+      "descripcion": "VENTILADOR ROSA RETRO DESK 400"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "08208",
+      "descripcion": "VENTILADOR BEIGE RETRO - 800"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "02450",
+      "descripcion": "PLACA INDUCCIÓN BOLERO SQUAD - 2 FUEGOS"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "A01_EU01_100188",
+      "descripcion": "PLACA GAS 43 FUEGOS INOX - 60CM"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "04181",
+      "descripcion": "JARRA PURIFICADORA AGUA H2ONATURE 2400"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "02310",
+      "descripcion": "SACACORCHOS ELÉCTRICO INSTANTCORK 1000"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "04109",
+      "descripcion": "HERVIDOR VAPOVITA 3000 INOX - VAPORERA"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "02307",
+      "descripcion": "CORTAFIAMBRES ROCK´CUT TWIN"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "03260",
+      "descripcion": "ACEITERA SPRAY POLKA "
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "02229",
+      "descripcion": "PANIFICADORA"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01180",
+      "descripcion": "UTENSILIOS COCINA AMARILLO"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01181",
+      "descripcion": "UTENSILIOS COCINA ROSA"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01024",
+      "descripcion": "SET CUCHILLOS 6 SWISS NEGRO"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "01012",
+      "descripcion": "SET CUCHILLOS 7 TITANIUM"
+    },
+    {
+      "marca": "CECOTEC",
+      "codigo": "00644",
+      "descripcion": "VAPORETA MANUAL VENTANAS"
+    }
+  ]
+}

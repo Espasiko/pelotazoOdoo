@@ -30,8 +30,8 @@ export const useImportacion = () => {
     { id: 'ALFADYSER', nombre: 'ALFADYSER' },
     { id: 'VITROKITCHEN', nombre: 'VITROKITCHEN' },
     { id: 'ELECTRODIRECTO', nombre: 'ELECTRODIRECTO' },
-    { id: 'ALMCE', nombre: 'ALMACENES' },
-    { id: 'ALMACENES', nombre: 'ALMACENES (Alternativo)' },
+    { id: 'ALMCE', nombre: 'ALMCE' },
+    // { id: 'ALMACENES', nombre: 'ALMACENES (Alternativo)' }, // Ocultamos la alternativa para evitar confusión
     { id: 'GENERICO', nombre: 'Genérico (Otros proveedores)' }
   ];
 

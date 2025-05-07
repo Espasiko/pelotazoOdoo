@@ -42,33 +42,46 @@ export async function leerArchivoExcel(filePath) {
 }
 
 /**
- * Lee un archivo JSON
+ * Lee un archivo JSON y lo normaliza a un array de objetos planos compatibles con el parser universal
+ * - Si el JSON es un array de arrays, usa la primera fila como cabecera
+ * - Si es un array de objetos, lo devuelve tal cual
+ * - Si es un objeto, lo mete en un array
+ * - Si detecta formato inválido, lanza error descriptivo
  * @param {string} filePath - Ruta al archivo JSON
- * @returns {Promise<Array>} - Datos del archivo JSON
+ * @returns {Promise<Array>} - Datos normalizados
  */
-async function leerArchivoJSON(filePath) {
+export async function leerArchivoJSONNormalizado(filePath) {
   try {
-    console.log(`Leyendo archivo JSON: ${filePath}`);
-    
-    // Leer el archivo
+    console.log(`[leerArchivoJSONNormalizado] Leyendo archivo JSON: ${filePath}`);
     const fileContent = fs.readFileSync(filePath, 'utf8');
-    
-    // Parsear el contenido JSON
-    const datos = JSON.parse(fileContent);
-    
-    // Verificar si es un array o un objeto
-    if (Array.isArray(datos)) {
-      console.log(`Leídos ${datos.length} registros del archivo JSON`);
-      return datos;
-    } else if (typeof datos === 'object') {
-      // Si es un objeto, convertirlo en un array con un solo elemento
-      console.log('El archivo JSON contiene un objeto, convirtiéndolo a array');
-      return [datos];
-    } else {
-      throw new Error('El archivo JSON no contiene un array o un objeto válido');
+    let datos = JSON.parse(fileContent);
+    // Caso: array de arrays (tipo Excel exportado a JSON)
+    if (Array.isArray(datos) && Array.isArray(datos[0])) {
+      const cabecera = datos[0];
+      const filas = datos.slice(1);
+      const resultado = filas.map(fila => {
+        const obj = {};
+        cabecera.forEach((col, idx) => {
+          obj[col] = fila[idx];
+        });
+        return obj;
+      });
+      console.log(`[leerArchivoJSONNormalizado] Normalizado array de arrays a array de objetos (${resultado.length} registros)`);
+      return resultado;
     }
+    // Caso: array de objetos
+    if (Array.isArray(datos)) {
+      console.log(`[leerArchivoJSONNormalizado] Array de objetos detectado (${datos.length} registros)`);
+      return datos;
+    }
+    // Caso: objeto único
+    if (typeof datos === 'object') {
+      console.log('[leerArchivoJSONNormalizado] Objeto único detectado, convirtiendo a array');
+      return [datos];
+    }
+    throw new Error('El archivo JSON no contiene un array o un objeto válido');
   } catch (error) {
-    console.error('Error al leer archivo JSON:', error);
+    console.error('[leerArchivoJSONNormalizado] Error al leer archivo JSON:', error);
     throw error;
   }
 }
@@ -93,7 +106,7 @@ export async function leerArchivo(filePath) {
       case '.xls':
         return await leerArchivoExcel(filePath);
       case '.json':
-        return await leerArchivoJSON(filePath);
+        return await leerArchivoJSONNormalizado(filePath);
       default:
         throw new Error(`Formato de archivo no soportado: ${extension}`);
     }

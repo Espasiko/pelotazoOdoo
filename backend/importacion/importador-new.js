@@ -10,7 +10,18 @@ import path from 'path';
 
 // Importar módulos refactorizados
 import { leerArchivo } from './file-readers.js';
-import { proveedorParsers } from './parsers.js';
+import { 
+  parserGenericoUniversal, 
+  parseCecotec, 
+  parseBSH, 
+  parseJata, 
+  parseOrbegozo, 
+  parseAlfadyser, 
+  parseVitrokitchen, 
+  parseElectrodirecto, 
+  parseAlmacenes,
+  parseEasJohnson // Agregar el parser para EAS-JOHNSON
+} from './parsers.js';
 import { detectarCategorias, asignarCategoria, analizarNota } from './categorias.js';
 import { 
   obtenerIdProveedor, 
@@ -33,139 +44,147 @@ function logProductoEnvio(accion, body) {
 }
 
 /**
- * Función principal para importar datos
- * @param {string} filePath - Ruta al archivo a importar
+ * Importar datos desde un archivo a la base de datos
+ * @param {string} filePath - Ruta del archivo a importar
  * @param {string} proveedor - Nombre del proveedor
  * @param {string} tipo - Tipo de importación (productos, precios, stock)
- * @param {string} importacionId - ID de la importación (opcional)
+ * @param {string} importacionId - ID de la importación
  * @returns {Promise<Object>} - Resultado de la importación
  */
-export async function importarDatos(filePath, proveedor, tipo, importacionId = null) {
+export async function importarDatos(filePath, proveedor, tipo = 'productos', importacionId = null) {
+  console.log(`Iniciando importación desde ${filePath} para proveedor ${proveedor}`);
+  
   try {
-    console.log(`Iniciando importación de ${tipo} desde ${proveedor}...`);
-    console.log(`ID de importación: ${importacionId || 'No especificado'}`);
+    // Determinar el tipo de archivo basado en la extensión
+    const fileType = path.extname(filePath).toLowerCase().replace('.', '');
+    console.log(`Tipo de archivo detectado: ${fileType}`);
     
-    // Autenticarse como admin
-    try {
-      await autenticarAdmin();
-    } catch (error) {
-      console.error('Error al autenticar:', error);
-      if (importacionId) {
-        await actualizarImportacion(importacionId, 'error', { error: 'Error de autenticación' });
-        await actualizarLog(importacionId, `Error de autenticación: ${error.message}`);
-      }
-      return { exito: false, error: 'Error de autenticación' };
-    }
-
-    // Si no se proporcionó un ID de importación, crear uno nuevo
-    let importacion = null;
-    if (!importacionId) {
-      importacion = await fetchAdmin(`/api/collections/importaciones/records`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          fecha: new Date().toISOString(),
-          tipo: tipo,
-          estado: 'procesando',
-          archivo: path.basename(filePath),
-          log: `Iniciando importación: ${new Date().toISOString()}\n`,
-        }),
-      });
-      importacionId = importacion.id;
-    } else {
-      importacion = await fetchAdmin(`/api/collections/importaciones/records/${importacionId}`);
-    }
-
-    // Leer el archivo según su extensión
-    let datos = [];
-    try {
-      datos = await leerArchivo(filePath);
-      console.log(`Leídos ${datos.length} registros del archivo`);
+    // Leer archivo según su tipo
+    const datos = await leerArchivo(filePath, fileType);
+    console.log(`Leídos ${datos.length} registros del archivo`);
+    
+    // Actualizar log si hay ID de importación
+    if (importacionId) {
       await actualizarLog(importacionId, `Leídos ${datos.length} registros del archivo`);
-    } catch (error) {
-      console.error('Error al leer archivo:', error);
-      await actualizarLog(importacionId, `Error al leer archivo: ${error.message}`);
-      await actualizarImportacion(importacionId, 'error', { error: `Error al leer archivo: ${error.message}` });
-      return { exito: false, error: `Error al leer archivo: ${error.message}` };
     }
     
-    // Buscar el proveedor por nombre
-    let proveedorId = null;
-    if (proveedor) {
-      try {
-        console.log(`Buscando proveedor con nombre: ${proveedor}`);
-        const proveedoresRes = await fetchAdmin(`/api/collections/proveedores/records?filter=(nombre~'${proveedor}')`);
-        
-        if (proveedoresRes && proveedoresRes.items && proveedoresRes.items.length > 0) {
-          proveedorId = proveedoresRes.items[0].id;
-          console.log(`Proveedor encontrado con ID: ${proveedorId}`);
-        } else {
-          // Si no existe el proveedor, lo creamos
-          console.log(`Proveedor no encontrado, creando nuevo proveedor: ${proveedor}`);
-          const nuevoProveedor = await fetchAdmin(`/api/collections/proveedores/records`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              nombre: proveedor,
-              activo: true
-            }),
-          });
-          
-          if (nuevoProveedor && nuevoProveedor.id) {
-            proveedorId = nuevoProveedor.id;
-            console.log(`Nuevo proveedor creado con ID: ${proveedorId}`);
-          }
-        }
-      } catch (error) {
-        console.error(`Error al buscar/crear proveedor: ${error.message}`);
-      }
+    // Procesar datos según el proveedor
+    const resultado = await procesarArchivo(datos, proveedor);
+    console.log(`Procesados ${resultado.productos.length} registros`);
+    
+    // Actualizar log si hay ID de importación
+    if (importacionId) {
+      await actualizarLog(importacionId, `Procesados ${resultado.productos.length} registros`);
     }
     
-    // Usar el parser específico para el proveedor o el genérico si no existe
-    const parser = proveedorParsers[proveedor.toUpperCase()] || proveedorParsers['GENERICO'];
-    const datosProcesados = parser(datos, tipo);
-    console.log(`Procesados ${datosProcesados.length} registros`);
-    await actualizarLog(importacionId, `Procesados ${datosProcesados.length} registros`);
+    // Detectar categorías únicas
+    const categoriasUnicas = resultado.categorias || [];
+    console.log(`Detectadas ${categoriasUnicas.length} categorías`);
     
-    // Detectar categorías en los datos
-    const categorias = await detectarCategorias(datosProcesados);
-    console.log(`Detectadas ${categorias.length} categorías`);
-    await actualizarLog(importacionId, `Detectadas ${categorias.length} categorías`);
+    // Actualizar log si hay ID de importación
+    if (importacionId) {
+      await actualizarLog(importacionId, `Detectadas ${categoriasUnicas.length} categorías`);
+    }
     
-    // Importar a la base de datos
-    const resultado = await importarABaseDeDatos(datosProcesados, proveedor, importacionId, fetchAdmin /*, proveedorId, categorias */);
-    console.log(`Importación completada: ${resultado.stats.creados} creados, ${resultado.stats.actualizados} actualizados, ${resultado.stats.errores} errores`);
-    await actualizarLog(importacionId, `Importación completada: ${resultado.stats.creados} creados, ${resultado.stats.actualizados} actualizados, ${resultado.stats.errores} errores`);
+    // Importar a la base de datos usando la función fetchAdmin importada al principio del archivo
+    const resultadoImportacion = await importarABaseDeDatos(
+      resultado.productos, 
+      proveedor, 
+      importacionId, 
+      fetchAdmin, // Usar la función fetchAdmin importada
+      categoriasUnicas
+    );
     
-    // Actualizar el estado de la importación
-    await actualizarImportacion(importacionId, resultado.exito ? 'completado' : 'error', resultado);
+    console.log(`Importación completada: ${resultadoImportacion.stats.creados} creados, ${resultadoImportacion.stats.actualizados} actualizados, ${resultadoImportacion.stats.errores} errores`);
     
-    return resultado;
+    // Actualizar log si hay ID de importación
+    if (importacionId) {
+      await actualizarLog(importacionId, `Importación completada: ${resultadoImportacion.stats.creados} creados, ${resultadoImportacion.stats.actualizados} actualizados, ${resultadoImportacion.stats.errores} errores`);
+    }
+    
+    return resultadoImportacion;
   } catch (error) {
     console.error('Error en importación:', error);
     
+    // Actualizar log si hay ID de importación
     if (importacionId) {
-      await actualizarImportacion(importacionId, 'error', { error: error.message });
-      await actualizarLog(importacionId, `Error: ${error.message}`);
+      await actualizarLog(importacionId, `Error en importación: ${error.message}`);
     }
     
-    return { exito: false, error: error.message };
+    return {
+      exito: false,
+      error: error.message || 'Error desconocido en la importación'
+    };
   }
 }
 
 /**
- * Importa los datos procesados a la base de datos
+ * Procesar archivo según el proveedor
+ * @param {Array} datos - Datos a procesar
+ * @param {string} proveedor - Nombre del proveedor
+ * @returns {Object} - Datos procesados
+ */
+async function procesarArchivo(datos, proveedor) {
+  // Normalizar nombre del proveedor
+  const proveedorNormalizado = (proveedor || '').toLowerCase().trim();
+  
+  // Seleccionar parser según el proveedor
+  let resultado;
+  
+  switch (proveedorNormalizado) {
+    case 'cecotec':
+      resultado = parseCecotec(datos, 'productos');
+      break;
+    case 'bsh':
+      resultado = parseBSH(datos, 'productos');
+      break;
+    case 'jata':
+      resultado = parseJata(datos, 'productos');
+      break;
+    case 'orbegozo':
+      resultado = parseOrbegozo(datos, 'productos');
+      break;
+    case 'alfadyser':
+      resultado = parseAlfadyser(datos, 'productos');
+      break;
+    case 'vitrokitchen':
+      resultado = parseVitrokitchen(datos, 'productos');
+      break;
+    case 'electrodirecto':
+      resultado = parseElectrodirecto(datos, 'productos');
+      break;
+    case 'almce':
+    case 'almacenes':
+      resultado = parseAlmacenes(datos, 'productos');
+      break;
+    case 'eas':
+    case 'johnson':
+    case 'eas-johnson':
+    case 'eas johnson':
+    case 'eas electric':
+    case 'johnson electric':
+      console.log('Usando parser específico para EAS-JOHNSON');
+      resultado = parseEasJohnson(datos, 'productos');
+      break;
+    default:
+      // Parser genérico para cualquier otro proveedor
+      console.log(`No se encontró parser específico para el proveedor "${proveedor}", usando parser genérico universal`);
+      resultado = parserGenericoUniversal(datos, 'productos');
+  }
+  
+  return resultado;
+}
+
+/**
+ * Importar datos procesados a la base de datos
  * @param {Array} datos - Datos procesados a importar
  * @param {string} proveedorNombre - Nombre del proveedor
- * @param {string} importacionId - ID de la importación
- * @param {function} fetchAdminFunc - Función para realizar llamadas fetch autenticadas como admin.
+ * @param {string} importacionId - Identificador único de la importación
+ * @param {Function} fetchAdminFunc - Función para hacer peticiones autenticadas a PocketBase
+ * @param {Array} categoriasDetectadas - Lista de categorías detectadas en el archivo
  * @returns {Promise<Object>} - Resultado de la importación
  */
-async function importarABaseDeDatos(datos, proveedorNombre, importacionId, fetchAdminFunc /* Antiguamente pbClient, pero es fetchAdmin */) {
+async function importarABaseDeDatos(datos, proveedorNombre, importacionId, fetchAdminFunc /* Antiguamente pbClient, pero es fetchAdmin */, categoriasDetectadas = []) {
   console.log(`Importando ${datos.length} productos a la base de datos para proveedor ${proveedorNombre || 'desconocido'}`);
   
   if (!fetchAdminFunc) { // Verificación del parámetro renombrado
@@ -194,14 +213,28 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, fetch
       console.log(`Resolviendo ID para el proveedor principal: ${proveedorNombre}`);
       idProveedorPrincipal = await obtenerOCrearIdRelacion(proveedorNombre, 'proveedores', fetchAdminFunc);
       if (!idProveedorPrincipal) {
-        console.warn(`No se pudo resolver o crear el proveedor principal '${proveedorNombre}'. Los productos no se asociarán a un proveedor principal.`);
-        stats.erroresDetalle.push({ producto: 'Configuración General', campo: 'proveedorPrincipal', valor: proveedorNombre, error: 'No se pudo resolver/crear ID del proveedor.' });
+        console.warn(`No se pudo resolver/crear ID para el proveedor ${proveedorNombre}`);
+      } else {
+        console.log(`ID del proveedor principal resuelto: ${idProveedorPrincipal}`);
       }
-    } else {
-      console.warn('No se proporcionó nombre de proveedor principal. Los productos no se asociarán a un proveedor principal.');
     }
-
-    // Procesar los datos y crear/actualizar productos
+    
+    // 2. Pre-crear todas las categorías detectadas
+    console.log(`Pre-creando ${categoriasDetectadas.length} categorías detectadas...`);
+    const categoriasIds = {};
+    for (const nombreCategoria of categoriasDetectadas) {
+      if (nombreCategoria && nombreCategoria.trim()) {
+        const categoriaId = await obtenerOCrearIdRelacion(nombreCategoria.trim(), 'categorias', fetchAdminFunc);
+        if (categoriaId) {
+          categoriasIds[nombreCategoria.trim()] = categoriaId;
+          console.log(`Categoría "${nombreCategoria}" pre-creada/encontrada con ID: ${categoriaId}`);
+        } else {
+          console.warn(`No se pudo pre-crear/encontrar la categoría "${nombreCategoria}"`);
+        }
+      }
+    }
+    
+    // 3. Procesar cada producto
     for (let i = 0; i < datos.length; i++) {
       const item = datos[i];
       
@@ -241,22 +274,34 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, fetch
           continue; // Saltar este producto
         }
 
-        // Campos esperados del parser para categoría y marca
-        const nombreCategoriaDetectada = item.categoriaExtraidaDelParser;
-        const marcaDetectada = item.marcaExtraidaDelParser;
-
         // Crear el objeto base del producto
         const producto = {
           codigo: String(item.codigo || item.CODIGO || item.EAN || item.REFERENCIA || `SIN_CODIGO_${i}`),
           nombre: String(item.nombre || item.DESCRIPCION || item.CONCEPTO || item.TITULO || 'Sin Nombre'),
           descripcion: String(item.descripcion_larga || item.DESCRIPCION || ''), // Usar un campo más descriptivo si existe
-          precio_costo: normalizaPrecio(item.precio_costo || item.NETO || 0, 0),
+          
+          // Campos financieros - preservar valores originales sin recalcular
+          precio_compra: normalizaPrecio(item.precio_compra || item.PRECIO_COMPRA || item.NETO || 0, 0),
           precio_venta: precioVentaValido,
-          iva: normalizaPrecio(item.iva || item.IVA || 21, 21),
+          iva: normalizaPrecio(item.iva || item.iva_recargo || item.IVA || 21, 21),
+          
+          // Campos de inventario
           stock: parseInt(item.stock || item.STOCK || item.UNIDADES || item['UNID.'] || '0', 10) || 0,
+          
+          // Campos adicionales específicos
+          margen: normalizaPrecio(item.margen || 0),
+          descuento: normalizaPrecio(item.descuento || item.descuento1 || 0),
+          descuento_adicional: normalizaPrecio(item.descuento2 || 0),
+          beneficio_unitario: normalizaPrecio(item.beneficio_unitario || 0),
+          beneficio_total: normalizaPrecio(item.beneficio_total || 0),
+          vendidas: parseInt(item.vendidas || 0, 10),
+          pvp_web: normalizaPrecio(item.pvp_web || 0),
+          
+          // Estado del producto
           activo: true,
           visible: true, // Asegurarnos de que el producto sea visible
-          marca: marcaDetectada || null, // Asignación de marca como texto
+          
+          // Datos completos para referencia
           datos_origen: JSON.stringify(item) // Guardar datos originales para referencia
         };
         
@@ -270,15 +315,14 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, fetch
         console.log(`Procesando producto ${i}: ${producto.codigo} - ${producto.nombre}`);
         
         // ASIGNACIÓN DE CATEGORÍA
-        if (nombreCategoriaDetectada) {
-          console.log(`Intentando resolver ID para categoría: '${nombreCategoriaDetectada}' para producto ${producto.codigo}`);
-          const categoriaIdPocketbase = await obtenerOCrearIdRelacion(nombreCategoriaDetectada, 'categorias', fetchAdminFunc);
-          if (categoriaIdPocketbase) {
-            producto.categoria = categoriaIdPocketbase; // Asignar el ID para la relación
-            console.log(`Categoría ID ${categoriaIdPocketbase} asignada a producto ${producto.codigo}`);
+        if (item.categoriaExtraidaDelParser) {
+          const categoriaId = categoriasIds[item.categoriaExtraidaDelParser.trim()];
+          if (categoriaId) {
+            producto.categoria = categoriaId; // Asignar el ID para la relación
+            console.log(`Categoría ID ${categoriaId} asignada a producto ${producto.codigo}`);
           } else {
-            stats.erroresDetalle.push({ producto: producto.codigo, campo: 'categoria', valor: nombreCategoriaDetectada, error: `No se pudo resolver/crear ID para categoría.` });
-            console.warn(`No se pudo resolver o crear la categoría '${nombreCategoriaDetectada}' para el producto ${producto.codigo}.`);
+            stats.erroresDetalle.push({ producto: producto.codigo, campo: 'categoria', valor: item.categoriaExtraidaDelParser, error: `No se pudo resolver/crear ID para categoría.` });
+            console.warn(`No se pudo resolver o crear la categoría '${item.categoriaExtraidaDelParser}' para el producto ${producto.codigo}.`);
             // No se incrementa stats.errores aquí, se hará si la creación/actualización del producto falla debido a esto (si categoria es obligatoria)
           }
         } else {
@@ -332,15 +376,29 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, fetch
                 nombre: producto.nombre || productoExistente.nombre,
                 codigo: producto.codigo || productoExistente.codigo,
                 descripcion: producto.descripcion || productoExistente.descripcion || '',
-                precio: parseFloat(producto.precio) || parseFloat(productoExistente.precio) || 0,
-                precio_venta: typeof producto.precio_venta === 'number' && !isNaN(producto.precio_venta) ? producto.precio_venta : 0,
+                precio_venta: typeof producto.precio_venta === 'number' && !isNaN(producto.precio_venta) ? producto.precio_venta : productoExistente.precio_venta || 0,
+                precio_compra: typeof producto.precio_compra === 'number' && !isNaN(producto.precio_compra) ? producto.precio_compra : productoExistente.precio_compra || 0,
                 iva: parseFloat(producto.iva) || parseFloat(productoExistente.iva) || 21,
                 stock: parseInt(producto.stock) || parseInt(productoExistente.stock) || 0,
+                
+                // Campos adicionales específicos - preservar valores originales
+                margen: typeof producto.margen === 'number' ? producto.margen : productoExistente.margen || 0,
+                descuento: typeof producto.descuento === 'number' ? producto.descuento : productoExistente.descuento || 0,
+                descuento_adicional: typeof producto.descuento_adicional === 'number' ? producto.descuento_adicional : productoExistente.descuento_adicional || 0,
+                beneficio_unitario: typeof producto.beneficio_unitario === 'number' ? producto.beneficio_unitario : productoExistente.beneficio_unitario || 0,
+                beneficio_total: typeof producto.beneficio_total === 'number' ? producto.beneficio_total : productoExistente.beneficio_total || 0,
+                vendidas: parseInt(producto.vendidas) || parseInt(productoExistente.vendidas) || 0,
+                pvp_web: typeof producto.pvp_web === 'number' ? producto.pvp_web : productoExistente.pvp_web || 0,
+                
+                // Estado del producto
                 activo: producto.activo !== undefined ? producto.activo : productoExistente.activo !== undefined ? productoExistente.activo : true,
                 visible: producto.visible !== undefined ? producto.visible : productoExistente.visible !== undefined ? productoExistente.visible : true,
+                
                 // Asegurarnos de que las relaciones se envían correctamente
                 proveedor: producto.proveedor || productoExistente.proveedor || null,
                 categoria: producto.categoria || productoExistente.categoria || null,
+                
+                // Datos de origen actualizados
                 datos_origen: JSON.stringify({
                   ...JSON.parse(productoExistente.datos_origen || '{}'),
                   ...JSON.parse(producto.datos_origen || '{}')
@@ -404,8 +462,8 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, fetch
                 nombre: producto.nombre,
                 codigo: producto.codigo,
                 descripcion: producto.descripcion || '',
-                precio: parseFloat(producto.precio) || 0,
                 precio_venta: typeof producto.precio_venta === 'number' && !isNaN(producto.precio_venta) ? producto.precio_venta : 0,
+                precio_compra: typeof producto.precio_compra === 'number' && !isNaN(producto.precio_compra) ? producto.precio_compra : 0,
                 iva: parseFloat(producto.iva) || 21,
                 stock: parseInt(producto.stock) || 0,
                 activo: producto.activo !== undefined ? producto.activo : true,
@@ -441,7 +499,6 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, fetch
                 const productoMinimo = {
                   nombre: producto.nombre,
                   codigo: producto.codigo,
-                  precio: parseFloat(producto.precio) || 0,
                   precio_venta: typeof producto.precio_venta === 'number' && !isNaN(producto.precio_venta) ? producto.precio_venta : 0,
                   iva: parseFloat(producto.iva) || 21,
                   stock: parseInt(producto.stock) || 0,
