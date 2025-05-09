@@ -283,8 +283,9 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, fetch
           precio_venta: precioVentaValido,
           iva: normalizaPrecio(producto.iva || producto.iva_recargo || producto.IVA || 21, 21),
           
-          // Campos de inventario
-          stock: parseInt(producto.stock || producto.STOCK || producto.UNIDADES || producto['UNID.'] || '0', 10) || 0,
+          // Campos de inventario (ajustados a PocketBase)
+          stock_actual: parseInt(producto.stock_actual || producto.stock || producto.STOCK || producto.UNIDADES || producto['UNID.'] || producto['QUEDAN EN TIENDA'] || 0, 10),
+          unidades_vendidas: parseInt(producto.unidades_vendidas || producto.vendidas || producto['VENDIDAS'] || 0, 10),
           
           // Campos adicionales específicos
           margen: normalizaPrecio(producto.margen || 0),
@@ -303,8 +304,8 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, fetch
           datos_origen: JSON.stringify(producto) // Guardar datos originales para referencia
         };
         
-        // Log del producto base que se va a procesar
-        // console.log(`Producto base:`, JSON.stringify(productoBase, null, 2));
+        // Log detallado del producto base que se va a procesar
+        console.log(`[DEBUG] Producto base mapeado para PB:`, JSON.stringify(productoBase, null, 2));
         if (!productoBase.codigo || productoBase.codigo.startsWith('SIN_CODIGO_')) {
           console.log(`Producto sin código válido, saltando...`);
           continue;

@@ -14,14 +14,37 @@ import xlsx from 'xlsx';
  * @returns {Promise<Array>} - Array de objetos con los datos del CSV
  */
 export async function leerArchivoCSV(filePath) {
-  return new Promise((resolve, reject) => {
-    const results = [];
-    fs.createReadStream(filePath)
-      .pipe(csv())
-      .on('data', (data) => results.push(data))
-      .on('end', () => resolve(results))
-      .on('error', (error) => reject(error));
-  });
+  // Leer todo el archivo como texto
+  const fileContent = fs.readFileSync(filePath, 'utf8');
+  // Separar líneas
+  const lines = fileContent.split(/\r?\n/).filter(line => line.trim().length > 0);
+  // Buscar la línea de encabezado real (la que contiene CÓDIGO y DESCRIPCIÓN)
+  let headerIndex = lines.findIndex(line => /C[ÓO]DIGO/i.test(line) && /DESCRIPC[ÍI]ON/i.test(line));
+  if (headerIndex === -1) headerIndex = 0;
+  const headerLine = lines[headerIndex];
+  // Detectar separador (coma, punto y coma, tab, etc.)
+  let sep = ',';
+  if ((headerLine.match(/;/g) || []).length > (headerLine.match(/,/g) || []).length) sep = ';';
+  if ((headerLine.match(/\t/g) || []).length > (headerLine.match(/,/g) || []).length) sep = '\t';
+  // Quitar columnas vacías al inicio
+  let headers = headerLine.split(sep).map(h => h.trim()).filter(h => h.length > 0);
+  // Procesar filas de datos
+  const data = [];
+  for (let i = headerIndex + 1; i < lines.length; i++) {
+    const row = lines[i].split(sep);
+    // Saltar filas vacías o de separación
+    if (row.filter(cell => cell && cell.trim()).length < 2) continue;
+    // Quitar columnas vacías al inicio
+    let offset = 0;
+    while (row[offset] === '' && offset < row.length) offset++;
+    // Mapear datos a los headers
+    const obj = {};
+    for (let j = 0; j < headers.length; j++) {
+      obj[headers[j]] = row[j + offset] ? row[j + offset].trim() : '';
+    }
+    data.push(obj);
+  }
+  return data;
 }
 
 /**

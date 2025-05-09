@@ -55,7 +55,7 @@ const upload = multer({
   storage: storage,
   fileFilter(req, file, cb) {
     // Verificar extensiones permitidas
-    const extensionesPermitidas = ['.csv', '.xlsx', '.xls'];
+    const extensionesPermitidas = ['.csv', '.xlsx', '.xls', '.json'];
     const ext = path.extname(file.originalname).toLowerCase();
     
     if (extensionesPermitidas.includes(ext)) {
@@ -112,7 +112,7 @@ app.use((req, res, next) => {
 });
 
 // Endpoint para importar archivos
-app.post('/api/importar', upload.single('archivo'), async (req, res) => {
+app.post('/api/importar', verificarAutenticacion, upload.single('archivo'), async (req, res) => {
   try {
     console.log('Recibida solicitud de importación...');
     

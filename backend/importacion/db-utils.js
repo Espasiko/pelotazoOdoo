@@ -225,12 +225,16 @@ export async function registrarDevolucion(producto, analisisNota, proveedorId, i
  */
 export async function importarProducto(productoData, fetchAdminFunc) {
   try {
+    // Forzar que stock_actual y unidades_vendidas sean enteros
+    if ('stock_actual' in productoData) productoData.stock_actual = parseInt(productoData.stock_actual, 10) || 0;
+    if ('unidades_vendidas' in productoData) productoData.unidades_vendidas = parseInt(productoData.unidades_vendidas, 10) || 0;
+    console.log(`[IMPORTAR] Enviando producto con stock_actual:`, productoData.stock_actual, 'unidades_vendidas:', productoData.unidades_vendidas);
     const response = await fetchAdminFunc('/api/collections/productos/records', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(productoData)
     });
-    console.log(`Producto creado con ID: ${response.id}`);
+    console.log(`Producto creado con ID: ${response.id} stock_actual: ${response.stock_actual} unidades_vendidas: ${response.unidades_vendidas}`);
     return response;
   } catch (error) {
     console.error('Error al importar producto:', error);
@@ -247,12 +251,16 @@ export async function importarProducto(productoData, fetchAdminFunc) {
  */
 export async function actualizarProducto(productoId, productoData, fetchAdminFunc) {
   try {
+    // Forzar que stock_actual y unidades_vendidas sean enteros
+    if ('stock_actual' in productoData) productoData.stock_actual = parseInt(productoData.stock_actual, 10) || 0;
+    if ('unidades_vendidas' in productoData) productoData.unidades_vendidas = parseInt(productoData.unidades_vendidas, 10) || 0;
+    console.log(`[ACTUALIZAR] Enviando producto con stock_actual:`, productoData.stock_actual, 'unidades_vendidas:', productoData.unidades_vendidas);
     const response = await fetchAdminFunc(`/api/collections/productos/records/${productoId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(productoData)
     });
-    console.log(`Producto actualizado con ID: ${response.id}`);
+    console.log(`Producto actualizado con ID: ${response.id} stock_actual: ${response.stock_actual} unidades_vendidas: ${response.unidades_vendidas}`);
     return response;
   } catch (error) {
     console.error('Error al actualizar producto:', error);

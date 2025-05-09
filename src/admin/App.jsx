@@ -1,3 +1,4 @@
+import React from 'react';
 import { Refine } from '@refinedev/core';
 import { RefineKbar, RefineKbarProvider } from '@refinedev/kbar';
 import {
@@ -27,6 +28,7 @@ import Marcas from './components/marcas/Marcas';
 import { ClientesList } from './components/clientes';
 import { PedidosList } from './components/pedidos';
 import { FacturacionList } from './components/facturacion';
+import FacturaPdfPage from './components/facturacion/FacturaPdfPage.jsx'; 
 import { ImportadorPage } from './components/importacion';
 import { ConfiguracionPage } from './components/configuracion';
 
@@ -150,6 +152,7 @@ const AdminApp = () => {
                 <Route path="clientes" element={<ClientesList />} />
                 <Route path="pedidos" element={<PedidosList />} />
                 <Route path="facturacion" element={<FacturacionList />} />
+                <Route path="factura-pdf" element={<FacturaPdfPage />} />
                 <Route path="importacion" element={<ImportadorPage />} />
                 <Route path="configuracion" element={<ConfiguracionPage />} />
                 <Route path="*" element={<Navigate to="dashboard" />} />

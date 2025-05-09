@@ -229,47 +229,45 @@ export function parserGenericoUniversal(datos, tipo, config = {}) {
     }
 
     // Notas
-    let nota = '';
-    if (colNotas && row[colNotas]) nota = row[colNotas];
+    // Concatenar todas las posibles notas/comentarios sueltos
+    let notasConcat = [];
+    if (colNotas && row[colNotas]) notasConcat.push(row[colNotas]);
     // Buscar notas en campos extra
     for (const key of Object.keys(row)) {
       if ((key + '').toUpperCase().includes('NOTA') || (key + '').toUpperCase().includes('OBS')) {
-        nota = row[key];
+        if (row[key] && !notasConcat.includes(row[key])) notasConcat.push(row[key]);
       }
     }
-    // Crear objeto producto con todos los campos originales
+    // Además, incluir cualquier campo suelto de texto que no sea código, nombre, precio, etc.
+    const camposEstandar = [colCodigo, colDesc, colUnidades, colPrecio, colPVP, colPVPFinal, colVendidas, colTienda, colMarca, colDescuento, colMargen, colBeneficioUnitario, colBeneficioTotal, colIva];
+    for (const key of Object.keys(row)) {
+      if (!camposEstandar.includes(key) && typeof row[key] === 'string' && row[key].length > 2) {
+        notasConcat.push(row[key]);
+      }
+    }
+    let nota = notasConcat.filter(Boolean).join(' | ');
+
+    // Crear objeto producto con todos los campos originales y mapeados según PocketBase
     const producto = {
       codigo: codigo.toString().trim(),
       nombre: nombre.toString().trim(),
-      
-      // Campos financieros - preservar valores originales
+      descripcion: nombre.toString().trim(), // fallback si no hay campo descripción específico
       precio_compra: limpiarPrecio(row[colPrecio]),
       precio_venta: precioVenta,
-      
-      // Intentar extraer campos adicionales
       descuento: colDescuento ? limpiarPrecio(row[colDescuento]) : undefined,
       margen: colMargen ? limpiarPrecio(row[colMargen]) : undefined,
-      beneficio_unitario: colBeneficioUnitario ? limpiarPrecio(row[colBeneficioUnitario]) : undefined,
-      beneficio_total: colBeneficioTotal ? limpiarPrecio(row[colBeneficioTotal]) : undefined,
+      beneficio_unitario: colBeneficioUnitario ? limpiarPrecio(row[colBeneficioUnitario]) : 0,
+      beneficio_total: colBeneficioTotal ? limpiarPrecio(row[colBeneficioTotal]) : 0,
       iva: colIva ? limpiarPrecio(row[colIva]) : 21,
-      
-      // Campos de inventario
-      unidades: colUnidades ? parseInt(row[colUnidades] || 0) : undefined,
-      stock: colTienda ? parseInt(row[colTienda] || 0) : undefined,
-      vendidas: colVendidas ? parseInt(row[colVendidas] || 0) : undefined,
-      
-      // Otros campos
+      stock_actual: colTienda ? limpiarPrecio(row[colTienda]) : 0,
+      unidades_vendidas: colVendidas ? limpiarPrecio(row[colVendidas]) : 0,
+      notas: nota || '',
       categoriaExtraidaDelParser: categoriaActual,
       marca: marcaExtraida,
-      notas: nota,
-      
-      // Guardar datos originales completos
       datos_origen: JSON.stringify(row)
     };
-    
     // Log para depuración
     console.log(`[parserGenericoUniversal] Producto procesado: ${producto.codigo} - ${producto.nombre} - PV: ${producto.precio_venta}€`);
-    
     productos.push(producto);
   }
   console.log(`[parserGenericoUniversal] Productos extraídos: ${productos.length}`);
@@ -289,14 +287,19 @@ export function parserGenericoUniversal(datos, tipo, config = {}) {
  * @returns {Object} - Datos procesados y normalizados con categorías detectadas
  */
 export function parserALMCE(datos, tipo) {
-  // Mapeo específico ALMCE
+  // Mapeo específico ALMCE extendido
   const config = {
     'CÓDIGO': '__EMPTY_1',
     'DESCRIPCIÓN': '__EMPTY_2',
     'UNID': '__EMPTY_3',
     'IMPORTE': '__EMPTY_4',
+    'DTO': '__EMPTY_5',
+    'IVA': '__EMPTY_6',
+    'PRECIO_CON_MARGEN': '__EMPTY_7',
     'PVP': '__EMPTY_8',
     'FINAL': '__EMPTY_9',
+    'BENEFICIO_UNITARIO': '__EMPTY_14',
+    'BENEFICIO_TOTAL': '__EMPTY_15',
     'VENDIDAS': '__EMPTY_11',
     'TIENDA': '__EMPTY_12',
     'NOTA': '__EMPTY_16'
