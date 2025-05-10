@@ -23,7 +23,7 @@ import {
   parseEasJohnson // Agregar el parser para EAS-JOHNSON
 } from './parsers.js';
 import { detectarCategorias, asignarCategoria, analizarNota } from './categorias.js';
-import { obtenerIdProveedor, obtenerIdCategoria, importarProducto, actualizarProducto, actualizarLog, registrarDevolucion } from './db-utils.js';
+import dbUtils from './db-utils.js';
 
 // URL base de PocketBase
 const baseUrl = pocketbaseConfig.url;
@@ -73,7 +73,7 @@ export async function importarDatos(filePath, proveedor, tipo = 'productos', imp
     
     // Actualizar log si hay ID de importación
     if (importacionId) {
-      await actualizarLog(importacionId, `Leídos ${datos.length} registros del archivo`);
+      await dbUtils.actualizarLog(importacionId, `Leídos ${datos.length} registros del archivo`);
     }
     
     // Procesar datos según el proveedor
@@ -82,14 +82,14 @@ export async function importarDatos(filePath, proveedor, tipo = 'productos', imp
     
     // Actualizar log si hay ID de importación
     if (importacionId) {
-      await actualizarLog(importacionId, `Procesados ${resultado.productos.length} registros`);
+      await dbUtils.actualizarLog(importacionId, `Procesados ${resultado.productos.length} registros`);
     }
     
     // Detectar categorías explícitamente después de procesar los datos
     const categoriasDetectadas = await detectarCategorias(resultado.productos || []);
     const categoriasUnicasMap = {};
     for (const cat of categoriasDetectadas) {
-      const catId = await obtenerIdCategoria(cat.nombre, fetchAdmin); // Usar obtenerIdCategoria para obtener o crear ID
+      const catId = await dbUtils.obtenerIdCategoria(cat.nombre, fetchAdmin); // Usar obtenerIdCategoria para obtener o crear ID
       if (catId) {
         categoriasUnicasMap[cat.nombre] = catId;
       }
@@ -98,7 +98,7 @@ export async function importarDatos(filePath, proveedor, tipo = 'productos', imp
     
     // Actualizar log si hay ID de importación
     if (importacionId) {
-      await actualizarLog(importacionId, `Detectadas y mapeadas ${Object.keys(categoriasUnicasMap).length} categorías`);
+      await dbUtils.actualizarLog(importacionId, `Detectadas y mapeadas ${Object.keys(categoriasUnicasMap).length} categorías`);
     }
     
     // Importar a la base de datos
@@ -114,7 +114,7 @@ export async function importarDatos(filePath, proveedor, tipo = 'productos', imp
     
     // Actualizar log si hay ID de importación
     if (importacionId) {
-      await actualizarLog(importacionId, `Importación completada: ${resultadoImportacion.stats.creados} creados, ${resultadoImportacion.stats.actualizados} actualizados, ${resultadoImportacion.stats.errores} errores`);
+      await dbUtils.actualizarLog(importacionId, `Importación completada: ${resultadoImportacion.stats.creados} creados, ${resultadoImportacion.stats.actualizados} actualizados, ${resultadoImportacion.stats.errores} errores`);
     }
     
     return resultadoImportacion;
@@ -123,7 +123,7 @@ export async function importarDatos(filePath, proveedor, tipo = 'productos', imp
     
     // Actualizar log si hay ID de importación
     if (importacionId) {
-      await actualizarLog(importacionId, `Error en importación: ${error.message}`);
+      await dbUtils.actualizarLog(importacionId, `Error en importación: ${error.message}`);
     }
     
     return {
@@ -216,7 +216,7 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, fetch
     let idProveedorPrincipal = null;
     if (proveedorNombre) {
       console.log(`Resolviendo ID para el proveedor principal: ${proveedorNombre}`);
-      idProveedorPrincipal = await obtenerIdProveedor(proveedorNombre, fetchAdminFunc);
+      idProveedorPrincipal = await dbUtils.obtenerIdProveedor(proveedorNombre, fetchAdminFunc);
       if (!idProveedorPrincipal) {
         console.warn(`No se pudo resolver/crear ID para el proveedor ${proveedorNombre}`);
       } else {
@@ -227,7 +227,7 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, fetch
     // Pre-crear o obtener IDs de categorías usando obtenerIdCategoria
     const categoriasFinales = {};
     for (const catNombre of Object.keys(categoriasMap)) {
-      const catId = await obtenerIdCategoria(catNombre, fetchAdminFunc);
+      const catId = await dbUtils.obtenerIdCategoria(catNombre, fetchAdminFunc);
       if (catId) {
         categoriasFinales[catNombre] = catId;
       }
@@ -316,7 +316,7 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, fetch
         // ASIGNACIÓN DE CATEGORÍA
         if (producto.categoriaExtraidaDelParser) {
           const categoriaNombre = producto.categoriaExtraidaDelParser.trim();
-          const categoriaId = await obtenerIdCategoria(categoriaNombre, fetchAdminFunc);
+          const categoriaId = await dbUtils.obtenerIdCategoria(categoriaNombre, fetchAdminFunc);
           if (categoriaId) {
             productoBase.categoria = categoriaId;
             console.log(`Categoría ID ${categoriaId} asignada a producto ${productoBase.codigo}`);
@@ -348,11 +348,11 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, fetch
             categoria: existentes.items[0].categoria || null, // Mantener relación categoría existente si aplicable
             proveedor: existentes.items[0].proveedor || null
           };
-          await actualizarProducto(existentes.items[0].id, productoActualizado, fetchAdminFunc);
+          await dbUtils.actualizarProducto(existentes.items[0].id, productoActualizado, fetchAdminFunc);
           stats.actualizados++;
         } else {
           // Producto no existe, crearlo
-          await importarProducto(productoBase, fetchAdminFunc);
+          await dbUtils.importarProducto(productoBase, fetchAdminFunc);
           stats.creados++;
         }
         
@@ -360,7 +360,7 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, fetch
         if (producto.NOTAS || producto.OBSERVACIONES || producto.COMENTARIOS) {
           const analisisNota = analizarNota(producto.NOTAS || producto.OBSERVACIONES || producto.COMENTARIOS);
           if (analisisNota) {
-            await registrarDevolucion(productoBase, analisisNota, proveedorNombre, importacionId);
+            await dbUtils.registrarDevolucion(productoBase, analisisNota, proveedorNombre, importacionId);
             stats.devoluciones++;
           }
         }

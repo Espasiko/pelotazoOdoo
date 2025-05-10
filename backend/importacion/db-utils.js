@@ -4,104 +4,166 @@
  */
 
 import { pocketbaseConfig } from './config.js';
-import { autenticarAdmin, fetchAdmin } from './utils.js';
+import { autenticarAdmin, limpiarPrecio } from './utils.js';
+
+// URL base de PocketBase
+const baseUrl = pocketbaseConfig.url;
 
 /**
- * Obtiene el ID de un proveedor por su nombre
- * @param {string} nombreProveedor - Nombre del proveedor
- * @returns {Promise<string|null>} - ID del proveedor o null si no existe
+ * Realizar una petición autenticada como admin a PocketBase
+ * @param {string} endpoint - Endpoint al que hacer la petición
+ * @param {Object} options - Opciones de la petición
+ * @returns {Promise<Object>} - Respuesta de PocketBase
  */
-export async function obtenerIdProveedor(nombreProveedor) {
-  if (!nombreProveedor) {
-    console.log('No se proporcionó nombre de proveedor, usando genérico');
-    return null;
-  }
-  
-  // Normalizar el nombre del proveedor
-  const nombreNormalizado = nombreProveedor.trim().toUpperCase();
-  
-  // Buscar si el proveedor ya existe usando búsqueda aproximada
+export async function fetchAdmin(endpoint, options = {}) {
   try {
-    const proveedorExistente = await fetchAdmin(`/api/collections/proveedores/records`, {
-      method: 'GET',
-      params: {
-        filter: `nombre~"${nombreNormalizado}"`
-      }
-    });
-    
-    if (proveedorExistente.items && proveedorExistente.items.length > 0) {
-      console.log(`Proveedor encontrado con ID: ${proveedorExistente.items[0].id}`);
-      return proveedorExistente.items[0].id;
+    // Obtener token de autenticación
+    const authToken = await autenticarAdmin();
+    if (!authToken) {
+      throw new Error('No se pudo obtener token de autenticación');
     }
-  } catch (error) {
-    console.error('Error al buscar proveedor:', error);
-  }
-  
-  // Si no existe, crear un nuevo proveedor
-  console.log(`Creando nuevo proveedor: ${nombreProveedor}`);
-  
-  // Verificar si la colección existe
-  try {
-    const colecciones = await fetchAdmin(`/api/collections`);
-    const existeColeccion = colecciones.some(c => c.name === 'proveedores');
     
-    if (!existeColeccion) {
-      console.error('La colección proveedores no existe en PocketBase');
-      return `temp_${nombreNormalizado.replace(/\s+/g, '_').toLowerCase()}`;
-    }
-  } catch (error) {
-    console.error('Error al verificar colecciones:', error);
-  }
-  
-  // Crear el proveedor
-  try {
-    const nuevoProveedor = await fetchAdmin(`/api/collections/proveedores/records`, {
-      method: 'POST',
+    // Configurar URL
+    const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`;
+    
+    // Configurar opciones de la petición
+    const fetchOptions = {
+      ...options,
       headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        nombre: nombreProveedor,
-        activo: true,
-        fecha_alta: new Date().toISOString()
-      }),
-    });
+        ...options.headers,
+        'Authorization': `Bearer ${authToken}`
+      }
+    };
     
-    console.log(`Nuevo proveedor creado con ID: ${nuevoProveedor.id}`);
-    return nuevoProveedor.id;
+    // Realizar petición
+    console.log(`[fetchAdmin] ${options.method || 'GET'} ${url}`);
+    const response = await fetch(url, fetchOptions);
+    
+    // Para registro y depuración
+    const contentType = response.headers.get('content-type');
+    
+    // Verificar formato de respuesta para parsear adecuadamente
+    if (contentType && contentType.includes('application/json')) {
+      const data = await response.json();
+      if (!response.ok) {
+        throw { status: response.status, data, message: data.message || response.statusText };
+      }
+      return data;
+    } else if (contentType && contentType.includes('text/')) {
+      // Texto plano, HTML, etc.
+      const text = await response.text();
+      if (!response.ok) {
+        throw { status: response.status, data: text, message: response.statusText };
+      }
+      return { text };
+    } else {
+      // Otros tipos de datos (binarios, etc.)
+      const blob = await response.blob();
+      if (!response.ok) {
+        throw { status: response.status, data: blob, message: response.statusText };
+      }
+      return { blob };
+    }
   } catch (error) {
-    console.error('Error al crear proveedor:', error);
-    return null;
+    // Mejorar el logging de errores
+    if (error && error.data) {
+      console.error(`Error en fetchAdmin (${endpoint}):`, error.message || 'Error desconocido');
+      if (error.data.data) {
+        Object.keys(error.data.data).forEach(key => {
+          console.error(`- Campo ${key}: ${error.data.data[key].message}`);
+        });
+      }
+    } else {
+      console.error(`Error en fetchAdmin (${endpoint}):`, error);
+    }
+    throw error;
   }
 }
 
 /**
- * Obtiene un proveedor por su nombre
+ * Obtiene o crea un proveedor en PocketBase y devuelve su ID
  * @param {string} nombreProveedor - Nombre del proveedor
- * @returns {Promise<Object|null>} - Objeto proveedor o null si no existe
+ * @param {Function} fetchAdminFunc - Función para realizar peticiones autenticadas a PocketBase
+ * @returns {Promise<string|null>} - ID del proveedor o null si no se pudo obtener/crear
  */
-export async function obtenerProveedorPorNombre(nombreProveedor) {
-  if (!nombreProveedor) return null;
-  
+export async function obtenerIdProveedor(nombreProveedor, fetchAdminFunc = fetchAdmin) {
+  if (!nombreProveedor) {
+    console.warn('[obtenerIdProveedor] No se proporcionó nombre de proveedor');
+    return null;
+  }
+
   // Normalizar el nombre del proveedor
   const nombreNormalizado = nombreProveedor.trim().toUpperCase();
   
   try {
-    const proveedores = await fetchAdmin(`/api/collections/proveedores/records`, {
-      method: 'GET',
-      params: {
-        filter: `nombre~"${nombreNormalizado}"`
-      }
-    });
+    console.log(`[obtenerIdProveedor] Buscando proveedor por nombre: "${nombreNormalizado}"`);
     
-    if (proveedores.items && proveedores.items.length > 0) {
-      return proveedores.items[0];
+    // Buscar proveedor por nombre
+    const filtro = encodeURIComponent(`nombre = "${nombreNormalizado.replace(/"/g, '\\"')}"`);
+    const urlBusqueda = `/api/collections/proveedores/records?filter=${filtro}`;
+    
+    const resultado = await fetchAdminFunc(urlBusqueda);
+    
+    // Si existe, devolver su ID
+    if (resultado && resultado.items && resultado.items.length > 0) {
+      console.log(`[obtenerIdProveedor] Proveedor encontrado con ID: ${resultado.items[0].id}`);
+      return resultado.items[0].id;
     }
     
-    return null;
+    // Si no existe, crearlo
+    console.log(`[obtenerIdProveedor] Proveedor no encontrado, creando nuevo: "${nombreNormalizado}"`);
+    
+    // Crear nuevo proveedor
+    const nuevoProveedor = await fetchAdminFunc('/api/collections/proveedores/records', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nombre: nombreNormalizado,
+        activo: true
+      })
+    });
+    
+    console.log(`[obtenerIdProveedor] Nuevo proveedor creado con ID: ${nuevoProveedor.id}`);
+    return nuevoProveedor.id;
   } catch (error) {
-    console.error('Error al obtener proveedor por nombre:', error);
-    return null;
+    console.error(`[obtenerIdProveedor] Error al obtener/crear proveedor "${nombreNormalizado}":`, error);
+    
+    // Intento alternativo con FormData (por si hay problemas con JSON)
+    try {
+      console.log(`[obtenerIdProveedor] Intentando crear proveedor con FormData: "${nombreNormalizado}"`);
+      
+      // Crear FormData
+      const formData = new FormData();
+      formData.append('nombre', nombreNormalizado);
+      formData.append('activo', 'true');
+      
+      // Enviar solicitud
+      const nuevoProveedorFormData = await fetchAdminFunc('/api/collections/proveedores/records', {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (nuevoProveedorFormData && nuevoProveedorFormData.id) {
+        console.log(`[obtenerIdProveedor] Proveedor creado con FormData, ID: ${nuevoProveedorFormData.id}`);
+        
+        // Verificar que se creó correctamente
+        try {
+          const verificacion = await fetchAdminFunc(`/api/collections/proveedores/records/${nuevoProveedorFormData.id}`);
+          console.log(`[obtenerIdProveedor] Verificación exitosa del proveedor creado con FormData:`, verificacion);
+        } catch (verificacionError) {
+          console.warn(`[obtenerIdProveedor] Error en verificación del proveedor creado con FormData:`, verificacionError);
+          // No bloquear el proceso si falla esta verificación
+        }
+        
+        return nuevoProveedorFormData.id;
+      } else {
+        console.error('[obtenerIdProveedor] La respuesta de FormData no contiene un ID válido');
+        return null;
+      }
+    } catch (formDataError) {
+      console.error('[obtenerIdProveedor] Error al crear proveedor con FormData:', formDataError);
+      return null;
+    }
   }
 }
 
@@ -114,25 +176,39 @@ export async function obtenerProveedorPorNombre(nombreProveedor) {
  */
 export async function actualizarImportacion(importacionId, estado, resultado) {
   if (!importacionId) {
-    console.error('No se proporcionó ID de importación para actualizar');
+    console.warn('No se puede actualizar una importación sin ID');
     return null;
   }
   
   try {
-    const importacionActualizada = await fetchAdmin(`/api/collections/importaciones/records/${importacionId}`, {
+    const datos = {
+      estado: estado
+    };
+    
+    // Añadir estadísticas si hay resultado
+    if (resultado) {
+      if (resultado.stats) {
+        datos.total_registros = resultado.stats.total || 0;
+        datos.registros_exitosos = (resultado.stats.creados || 0) + (resultado.stats.actualizados || 0);
+        datos.registros_fallidos = resultado.stats.errores || 0;
+      }
+      
+      // Añadir notas si hay error
+      if (resultado.error) {
+        datos.notas = `Error: ${resultado.error}`;
+      }
+    }
+    
+    console.log(`Actualizando importación ${importacionId} a estado ${estado}`);
+    
+    const response = await fetchAdmin(`/api/collections/importaciones/records/${importacionId}`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        estado: estado,
-        resultado: JSON.stringify(resultado),
-        fecha_fin: new Date().toISOString()
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(datos)
     });
     
-    console.log(`Importación ${importacionId} actualizada a estado: ${estado}`);
-    return importacionActualizada;
+    console.log(`Importación actualizada: ${response.id}`);
+    return response;
   } catch (error) {
     console.error('Error al actualizar importación:', error);
     return null;
@@ -147,32 +223,49 @@ export async function actualizarImportacion(importacionId, estado, resultado) {
  */
 export async function actualizarLog(importacionId, mensaje) {
   if (!importacionId) {
-    console.error('No se proporcionó ID de importación para actualizar log');
+    console.warn('No se puede actualizar log de una importación sin ID');
+    return null;
+  }
+  
+  if (!mensaje) {
+    console.warn('No se puede actualizar log sin mensaje');
     return null;
   }
   
   try {
-    // Obtener importación actual
+    // Obtener registro actual para añadir al log
+    console.log(`Obteniendo importación ${importacionId} para actualizar log`);
     const importacion = await fetchAdmin(`/api/collections/importaciones/records/${importacionId}`);
     
-    // Añadir mensaje al log
-    const logActual = importacion.log || '';
-    const nuevoLog = `${logActual}${new Date().toISOString()}: ${mensaje}\n`;
+    if (!importacion) {
+      console.error(`No se encontró la importación ${importacionId}`);
+      return null;
+    }
     
-    // Actualizar importación
-    const importacionActualizada = await fetchAdmin(`/api/collections/importaciones/records/${importacionId}`, {
+    // Preparar nuevo mensaje de log con timestamp
+    const timestamp = new Date().toISOString();
+    const nuevoMensaje = `[${timestamp}] ${mensaje}`;
+    
+    // Añadir al log existente o crear nuevo
+    let logActualizado = '';
+    if (importacion.log) {
+      logActualizado = `${importacion.log}\n${nuevoMensaje}`;
+    } else {
+      logActualizado = nuevoMensaje;
+    }
+    
+    // Actualizar registro
+    console.log(`Actualizando log de importación ${importacionId}`);
+    const response = await fetchAdmin(`/api/collections/importaciones/records/${importacionId}`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        log: nuevoLog
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ log: logActualizado })
     });
     
-    return importacionActualizada;
+    console.log(`Log de importación actualizado: ${response.id}`);
+    return response;
   } catch (error) {
-    console.error('Error al actualizar log:', error);
+    console.error('Error al actualizar log de importación:', error);
     return null;
   }
 }
@@ -186,33 +279,37 @@ export async function actualizarLog(importacionId, mensaje) {
  * @returns {Promise<Object>} - Devolución creada
  */
 export async function registrarDevolucion(producto, analisisNota, proveedorId, importacionId) {
+  if (!producto || !analisisNota) {
+    console.warn('No se puede registrar una devolución sin producto o análisis');
+    return null;
+  }
+  
   try {
-    // Crear registro de devolución
-    const devolucion = await fetchAdmin(`/api/collections/devoluciones/records`, {
+    const datosDevolucion = {
+      producto: producto.id || null,
+      codigo_producto: producto.codigo || '',
+      nombre_producto: producto.nombre || '',
+      fecha: analisisNota.fecha || new Date().toISOString().split('T')[0],
+      cantidad: analisisNota.cantidad || 1,
+      motivo: analisisNota.motivo || 'Sin especificar',
+      proveedor: proveedorId || null,
+      importacion: importacionId || null,
+      estado: 'pendiente',
+      notas: analisisNota.textoCompleto || ''
+    };
+    
+    console.log(`Registrando devolución para producto ${producto.codigo || producto.id || 'desconocido'}`);
+    
+    const response = await fetchAdmin(`/api/collections/devoluciones/records`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        producto: producto.codigo,
-        nombre_producto: producto.nombre,
-        fecha: new Date().toISOString(),
-        motivo: analisisNota.motivo || 'No especificado',
-        cantidad: analisisNota.cantidad || 1,
-        importe: analisisNota.importe || 0,
-        proveedor: proveedorId,
-        importacion: importacionId,
-        estado: 'pendiente'
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(datosDevolucion)
     });
     
-    console.log(`Devolución registrada para producto ${producto.codigo}`);
-    await actualizarLog(importacionId, `Devolución registrada para producto ${producto.codigo}: ${analisisNota.motivo || 'No especificado'}`);
-    
-    return devolucion;
+    console.log(`Devolución registrada con ID: ${response.id}`);
+    return response;
   } catch (error) {
     console.error('Error al registrar devolución:', error);
-    await actualizarLog(importacionId, `Error al registrar devolución para producto ${producto.codigo}: ${error.message}`);
     return null;
   }
 }
@@ -228,13 +325,16 @@ export async function importarProducto(productoData, fetchAdminFunc) {
     // Forzar que stock_actual y unidades_vendidas sean enteros
     if ('stock_actual' in productoData) productoData.stock_actual = parseInt(productoData.stock_actual, 10) || 0;
     if ('unidades_vendidas' in productoData) productoData.unidades_vendidas = parseInt(productoData.unidades_vendidas, 10) || 0;
-    console.log(`[IMPORTAR] Enviando producto con stock_actual:`, productoData.stock_actual, 'unidades_vendidas:', productoData.unidades_vendidas);
+    
+    console.log(`[IMPORTAR] Enviando producto con código: ${productoData.codigo}`);
+    
     const response = await fetchAdminFunc('/api/collections/productos/records', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(productoData)
     });
-    console.log(`Producto creado con ID: ${response.id} stock_actual: ${response.stock_actual} unidades_vendidas: ${response.unidades_vendidas}`);
+    
+    console.log(`Producto creado con ID: ${response.id}`);
     return response;
   } catch (error) {
     console.error('Error al importar producto:', error);
@@ -254,13 +354,16 @@ export async function actualizarProducto(productoId, productoData, fetchAdminFun
     // Forzar que stock_actual y unidades_vendidas sean enteros
     if ('stock_actual' in productoData) productoData.stock_actual = parseInt(productoData.stock_actual, 10) || 0;
     if ('unidades_vendidas' in productoData) productoData.unidades_vendidas = parseInt(productoData.unidades_vendidas, 10) || 0;
-    console.log(`[ACTUALIZAR] Enviando producto con stock_actual:`, productoData.stock_actual, 'unidades_vendidas:', productoData.unidades_vendidas);
+    
+    console.log(`[ACTUALIZAR] Actualizando producto con ID: ${productoId}`);
+    
     const response = await fetchAdminFunc(`/api/collections/productos/records/${productoId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(productoData)
     });
-    console.log(`Producto actualizado con ID: ${response.id} stock_actual: ${response.stock_actual} unidades_vendidas: ${response.unidades_vendidas}`);
+    
+    console.log(`Producto actualizado con ID: ${response.id}`);
     return response;
   } catch (error) {
     console.error('Error al actualizar producto:', error);
@@ -285,7 +388,7 @@ export async function obtenerIdCategoria(nombreCategoria, fetchAdminFunc) {
   }
   const nombreNormalizado = nombreCategoria.trim();
   try {
-    console.log(`Buscando en categorías por nombre: '${nombreNormalizado}' usando fetchAdminFunc`);
+    console.log(`Buscando en categorías por nombre: '${nombreNormalizado}'`);
     const filtro = encodeURIComponent(`nombre = "${nombreNormalizado.replace(/"/g, '\"')}" `);
     const urlBusqueda = `/api/collections/categorias/records?filter=${filtro}`;
     const records = await fetchAdminFunc(urlBusqueda);
@@ -293,7 +396,7 @@ export async function obtenerIdCategoria(nombreCategoria, fetchAdminFunc) {
       console.log(`Categoría encontrada con ID: ${records.items[0].id}`);
       return records.items[0].id;
     } else {
-      console.log(`Creando nueva categoría: '${nombreNormalizado}' usando fetchAdminFunc`);
+      console.log(`Creando nueva categoría: '${nombreNormalizado}'`);
       const urlCreacion = `/api/collections/categorias/records`;
       const newRecord = await fetchAdminFunc(urlCreacion, {
         method: 'POST',
@@ -304,21 +407,24 @@ export async function obtenerIdCategoria(nombreCategoria, fetchAdminFunc) {
         console.log(`Nueva categoría creada con ID: ${newRecord.id}`);
         return newRecord.id;
       } else {
-        console.error(`No se pudo crear la categoría '${nombreNormalizado}'. Respuesta:`, newRecord);
+        console.error(`No se pudo crear la categoría '${nombreNormalizado}'`);
         return null;
       }
     }
   } catch (error) {
     console.error(`Error en obtenerIdCategoria para '${nombreNormalizado}':`, error);
-    if (error.data && error.data.data) {
-      Object.keys(error.data.data).forEach(key => {
-        if (error.data.data[key] && error.data.data[key].message) {
-          console.error(`Detalle del error de PocketBase (campo ${key}): ${error.data.data[key].message}`);
-        }
-      });
-    } else if (error.message) {
-      console.error('Error general en obtenerIdCategoria:', error.message);
-    }
     return null;
   }
 }
+
+// Exportar funciones principales
+const dbUtils = {
+  obtenerIdProveedor,
+  obtenerIdCategoria,
+  importarProducto,
+  actualizarProducto,
+  actualizarLog,
+  registrarDevolucion
+};
+
+export default dbUtils;
