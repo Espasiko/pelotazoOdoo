@@ -4,7 +4,7 @@
 
 // Configuración de PocketBase
 export const pocketbaseConfig = {
-  url: 'http://172.21.181.243:8090',
+  url: 'http://localhost:8090',
   admin: {
     email: 'yo@mail.com',
     password: 'Ninami12$ya'

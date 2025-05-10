@@ -137,11 +137,15 @@ export async function fetchAdmin(endpoint, options = {}) {
     // Asegurarnos de tener un token válido
     const token = await autenticarAdmin();
     
+    // Determinar si estamos usando FormData
+    const isFormData = options.body instanceof FormData;
+    
     // Configurar opciones por defecto
     const defaultOptions = {
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
+        // No establecer Content-Type para FormData, se establecerá automáticamente
+        ...(!isFormData && { 'Content-Type': 'application/json' })
       }
     };
     
@@ -151,24 +155,93 @@ export async function fetchAdmin(endpoint, options = {}) {
       ...options,
       headers: {
         ...defaultOptions.headers,
-        ...options.headers
+        // Filtrar encabezados que no deben estar presentes con FormData
+        ...(isFormData 
+            ? Object.entries(options.headers || {}).reduce((acc, [key, value]) => {
+                if (key.toLowerCase() !== 'content-type') acc[key] = value;
+                return acc;
+              }, {}) 
+            : options.headers)
       }
     };
     
-    // Realizar la petición
+    // Registrar información de la solicitud
     const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`;
-    const response = await fetch(url, fetchOptions);
-    
-    // Verificar si la respuesta es exitosa
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`Error en petición a ${url}: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`);
+    console.log(`[fetchAdmin] Enviando ${options.method || 'GET'} a ${url}`);
+    if (isFormData) {
+      console.log(`[fetchAdmin] Enviando FormData`);
+    } else if (options.body && typeof options.body === 'string') {
+      try {
+        // Intentar registrar el cuerpo como JSON si es posible
+        const bodyObj = JSON.parse(options.body);
+        console.log(`[fetchAdmin] Cuerpo de la solicitud:`, JSON.stringify(bodyObj));
+      } catch (e) {
+        // Si no es JSON válido, registrar como está
+        console.log(`[fetchAdmin] Cuerpo de la solicitud (no JSON):`, options.body.substring(0, 100) + '...');
+      }
     }
     
-    // Devolver la respuesta como JSON
-    return await response.json();
+    // Realizar la petición con reintentos
+    const maxRetries = 2;
+    let lastError = null;
+    
+    for (let retry = 0; retry <= maxRetries; retry++) {
+      try {
+        if (retry > 0) {
+          console.log(`[fetchAdmin] Reintento ${retry}/${maxRetries} para ${url}`);
+          // Esperar antes de reintentar
+          await new Promise(resolve => setTimeout(resolve, 1000 * retry));
+        }
+        
+        const response = await fetch(url, fetchOptions);
+        
+        // Verificar si la respuesta es exitosa
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({
+            status: response.status,
+            statusText: response.statusText
+          }));
+          
+          console.error(`[fetchAdmin] Error HTTP ${response.status}: ${JSON.stringify(errorData)}`);
+          
+          // Si es un error 429 (Too Many Requests) o 5xx, reintentar
+          if ((response.status === 429 || response.status >= 500) && retry < maxRetries) {
+            lastError = new Error(`Error en petición a ${url}: ${response.status} ${response.statusText}`);
+            lastError.response = response;
+            lastError.errorData = errorData;
+            continue; // Reintentar
+          }
+          
+          throw new Error(`Error en petición a ${url}: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`);
+        }
+        
+        // Intentar parsear la respuesta como JSON
+        try {
+          const jsonData = await response.json();
+          console.log(`[fetchAdmin] Respuesta exitosa de ${url}`);
+          return jsonData;
+        } catch (jsonError) {
+          // Si no es JSON, devolver un objeto con la información básica
+          console.warn(`[fetchAdmin] La respuesta no es JSON válido:`, jsonError);
+          return { success: true, status: response.status, statusText: response.statusText };
+        }
+      } catch (fetchError) {
+        lastError = fetchError;
+        
+        // Solo reintentar errores de red o timeout
+        if (retry < maxRetries && (fetchError.name === 'TypeError' || fetchError.name === 'AbortError')) {
+          console.warn(`[fetchAdmin] Error de red en intento ${retry}, reintentando:`, fetchError);
+          continue;
+        }
+        
+        throw fetchError;
+      }
+    }
+    
+    // Si llegamos aquí, todos los reintentos fallaron
+    throw lastError;
   } catch (error) {
-    console.error('Error en fetchAdmin:', error);
+    console.error('[fetchAdmin] Error final:', error);
     throw error;
   }
 }

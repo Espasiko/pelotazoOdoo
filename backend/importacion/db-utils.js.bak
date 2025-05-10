@@ -1,0 +1,690 @@
+/**
+ * Módulo de utilidades de base de datos para el sistema de importación
+ * Este módulo maneja operaciones CRUD y consultas a PocketBase
+ */
+
+import { pocketbaseConfig } from './config.js';
+import { autenticarAdmin, fetchAdmin } from './utils.js';
+import { proveedoresNormalizados as proveedoresNormalizadosParser } from './parsers.js';
+
+/**
+ * Obtiene el ID de un proveedor por su nombre
+ * @param {string} nombreProveedor - Nombre del proveedor
+ * @param {Function} [fetchAdminFunc] - Función para realizar la llamada API a PocketBase
+ * @returns {Promise<string|null>} - ID del proveedor o null si no existe
+ */
+export async function obtenerIdProveedor(nombreProveedor, fetchAdminFunc = fetchAdmin) {
+  if (!nombreProveedor) {
+    console.log('[obtenerIdProveedor] No se proporcionó nombre de proveedor, usando genérico');
+    return null;
+  }
+  
+  // Normalizar el nombre del proveedor
+  const nombreNormalizado = nombreProveedor.trim().toUpperCase();
+  console.log(`[obtenerIdProveedor] Buscando proveedor: ${nombreNormalizado}`);
+  
+  // Inicializar el registro global de proveedores creados si no existe
+  if (!global.proveedoresCreados) global.proveedoresCreados = [];
+  
+  // Usar el mapa de proveedores normalizados importado de parsers.js
+  // Convertir el mapa importado al formato que necesitamos
+  const proveedoresNormalizadosInvertido = {};
+  
+  // Recorrer el mapa importado y crear un mapa invertido
+  for (const [variante, nombreEstandar] of Object.entries(proveedoresNormalizadosParser)) {
+    if (!proveedoresNormalizadosInvertido[nombreEstandar]) {
+      proveedoresNormalizadosInvertido[nombreEstandar] = [];
+    }
+    proveedoresNormalizadosInvertido[nombreEstandar].push(variante);
+  }
+  
+  // Agregar algunas variantes adicionales que podrían no estar en el mapa importado
+  const proveedoresNormalizadosAdicionales = {
+    'CECOTEC': ['CECO-TEC', 'CECOTEC INNOVACIONES'],
+    'ALFADYSER': ['ALFA-DYSER', 'ALFA DYSER', 'ALFADYSER S.L.'],
+    'EAS-JOHNSON': ['EAS JOHNSON', 'EAS'],
+    'XIAOMI': ['MI', 'REDMI', 'POCO'],
+    'SAMSUNG': ['SAMGSUNG', 'SAMSNG'],
+    'APPLE': ['IPHONE', 'MAC', 'IPAD'],
+    'HUAWEI': ['HONOR'],
+    'OPPO': ['REALME', 'ONEPLUS'],
+    'SONY': ['PLAYSTATION', 'PS5', 'PS4'],
+    'MICROSOFT': ['XBOX', 'WINDOWS'],
+    'NINTENDO': ['SWITCH'],
+    'LG': ['LG ELECTRONICS'],
+    'PHILIPS': ['PHILIPS LIGHTING'],
+    'BOSCH': ['ROBERT BOSCH'],
+    'SIEMENS': ['BSH'],
+    'ASUS': ['REPUBLIC OF GAMERS', 'ROG']
+  };
+  
+  // Combinar los mapas
+  for (const [nombreEstandar, variantes] of Object.entries(proveedoresNormalizadosAdicionales)) {
+    if (!proveedoresNormalizadosInvertido[nombreEstandar]) {
+      proveedoresNormalizadosInvertido[nombreEstandar] = [];
+    }
+    proveedoresNormalizadosInvertido[nombreEstandar].push(...variantes);
+  }
+  
+  // Agregar cada nombre estándar como una variante de sí mismo
+  for (const nombreEstandar of Object.keys(proveedoresNormalizadosInvertido)) {
+    if (!proveedoresNormalizadosInvertido[nombreEstandar].includes(nombreEstandar)) {
+      proveedoresNormalizadosInvertido[nombreEstandar].push(nombreEstandar);
+    }
+  }
+  
+  console.log(`[obtenerIdProveedor] Mapa de proveedores normalizado:`, Object.keys(proveedoresNormalizadosInvertido));
+  
+  // Verificar si el nombre normalizado coincide con alguna variante conocida
+  let nombreNormalizadoFinal = nombreNormalizado;
+  for (const [nombreEstandar, variantes] of Object.entries(proveedoresNormalizadosInvertido)) {
+    if (variantes.some(v => nombreNormalizado.includes(v) || v.includes(nombreNormalizado))) {
+      nombreNormalizadoFinal = nombreEstandar;
+      console.log(`[obtenerIdProveedor] Nombre normalizado a estándar: ${nombreNormalizado} -> ${nombreEstandar}`);
+      break;
+    }
+  }
+  
+  // Lista de variantes de nombres para búsqueda
+  const variantes = [
+    nombreNormalizadoFinal,
+    nombreNormalizadoFinal.replace(/\s+/g, ''), // Sin espacios
+    nombreNormalizadoFinal.replace(/\-/g, ' '), // Guiones como espacios
+    nombreNormalizadoFinal.replace(/\./g, ''), // Sin puntos
+    nombreNormalizadoFinal.split(' ')[0], // Primera palabra
+  ];
+  
+  // Intentar encontrar el proveedor por nombre exacto primero
+  try {
+    console.log(`[obtenerIdProveedor] Buscando proveedor exacto: ${nombreNormalizadoFinal}`);
+    
+    // Buscar por nombre exacto
+    const proveedorExacto = await fetchAdminFunc(`/api/collections/proveedores/records`, {
+      method: 'GET',
+      params: {
+        filter: `nombre="${nombreNormalizadoFinal}"`,
+        sort: "-created",
+        perPage: 10
+      }
+    });
+    
+    if (proveedorExacto.items && proveedorExacto.items.length > 0) {
+      console.log(`[obtenerIdProveedor] Proveedor encontrado exacto: ${proveedorExacto.items[0].id} - ${proveedorExacto.items[0].nombre}`);
+      return proveedorExacto.items[0].id;
+    }
+    
+    // Si no encontramos por nombre exacto, intentar con una búsqueda más flexible
+    console.log(`[obtenerIdProveedor] No se encontró proveedor exacto, intentando búsqueda flexible`);
+    const proveedorFlexible = await fetchAdminFunc(`/api/collections/proveedores/records`, {
+      method: 'GET',
+      params: {
+        filter: `nombre~"${nombreNormalizadoFinal}"`,
+        sort: "-created",
+        perPage: 10
+      }
+    });
+    
+    if (proveedorFlexible.items && proveedorFlexible.items.length > 0) {
+      console.log(`[obtenerIdProveedor] Proveedor encontrado por búsqueda flexible: ${proveedorFlexible.items[0].id} - ${proveedorFlexible.items[0].nombre}`);
+      return proveedorFlexible.items[0].id;
+    }
+  } catch (error) {
+    console.warn(`[obtenerIdProveedor] Error al buscar proveedor:`, error);
+    // Continuar con el proceso de creación
+  }
+  
+  // Buscar si el proveedor ya existe usando búsqueda exacta primero, luego aproximada con variantes
+  for (const variante of variantes) {
+    try {
+      if (!variante || variante.length < 2) continue; // Evitar búsquedas con términos demasiado cortos
+      
+      // 1. Primero intentar con búsqueda exacta (más precisa)
+      console.log(`[obtenerIdProveedor] Intentando búsqueda exacta con variante: ${variante}`);
+      const proveedorExactoVariante = await fetchAdminFunc(`/api/collections/proveedores/records`, {
+        method: 'GET',
+        params: {
+          filter: `nombre="${variante}"`,
+          sort: "-created",
+          perPage: 10
+        }
+      });
+      
+      if (proveedorExactoVariante.items && proveedorExactoVariante.items.length > 0) {
+        console.log(`[obtenerIdProveedor] Proveedor encontrado exacto con variante "${variante}" con ID: ${proveedorExactoVariante.items[0].id} - ${proveedorExactoVariante.items[0].nombre}`);
+        return proveedorExactoVariante.items[0].id;
+      }
+      
+      // 2. Si no hay coincidencia exacta, usar búsqueda aproximada pero con más restricciones
+      console.log(`[obtenerIdProveedor] Intentando búsqueda aproximada con variante: ${variante}`);
+      // Usar un filtro más restrictivo para evitar coincidencias incorrectas
+      // Buscamos que el nombre contenga la variante o la variante contenga el nombre
+      const proveedorExistente = await fetchAdminFunc(`/api/collections/proveedores/records`, {
+        method: 'GET',
+        params: {
+          filter: `nombre~"${variante}"`,
+          sort: "-created", // Ordenar por fecha de creación descendente para obtener el más reciente primero
+          perPage: 20 // Obtener más resultados para mejorar las posibilidades de encontrar una buena coincidencia
+        }
+      });
+      
+      if (proveedorExistente.items && proveedorExistente.items.length > 0) {
+        // Calcular puntuaciones de similitud para todas las coincidencias
+        const coincidenciasConPuntuacion = proveedorExistente.items.map(item => {
+          const nombreProveedor = item.nombre.toUpperCase();
+          const varianteUpper = variante.toUpperCase();
+          let puntuacion = 0;
+          
+          // Criterios de puntuación
+          if (nombreProveedor === varianteUpper) puntuacion += 100; // Coincidencia exacta (ignorando mayúsculas/minúsculas)
+          else if (nombreProveedor.includes(varianteUpper)) puntuacion += 80; // La variante está contenida completamente
+          else if (varianteUpper.includes(nombreProveedor)) puntuacion += 70; // El nombre está contenido en la variante
+          else if (nombreProveedor.length >= 3 && varianteUpper.length >= 3 && 
+                  nombreProveedor.substring(0, 3) === varianteUpper.substring(0, 3)) {
+            puntuacion += 50; // Coinciden los primeros 3 caracteres
+          }
+          
+          // Bonus por longitud similar
+          const diferenciaTamanio = Math.abs(nombreProveedor.length - varianteUpper.length);
+          if (diferenciaTamanio <= 2) puntuacion += 20;
+          else if (diferenciaTamanio <= 5) puntuacion += 10;
+          
+          return {
+            item,
+            puntuacion,
+            nombre: nombreProveedor,
+            variante: varianteUpper
+          };
+        });
+        
+        // Ordenar por puntuación descendente
+        coincidenciasConPuntuacion.sort((a, b) => b.puntuacion - a.puntuacion);
+        
+        // Tomar la mejor coincidencia si supera un umbral mínimo
+        const mejorCoincidencia = coincidenciasConPuntuacion[0];
+        if (mejorCoincidencia.puntuacion >= 50) {
+          console.log(`[obtenerIdProveedor] Proveedor encontrado con variante "${variante}" con ID: ${mejorCoincidencia.item.id} - ${mejorCoincidencia.item.nombre} (Puntuación: ${mejorCoincidencia.puntuacion})`);
+          return mejorCoincidencia.item.id;
+        } else {
+          console.log(`[obtenerIdProveedor] Coincidencia descartada por baja puntuación (${mejorCoincidencia.puntuacion}): "${mejorCoincidencia.nombre}" vs "${mejorCoincidencia.variante}"`);
+        }
+      }
+    } catch (error) {
+      console.error(`[obtenerIdProveedor] Error al buscar proveedor con variante "${variante}":`, error);
+    }
+  }
+  
+  // Si no existe, crear un nuevo proveedor
+  console.log(`[obtenerIdProveedor] Creando nuevo proveedor: ${nombreProveedor}`);
+  
+  // Preparar el nombre final para la creación
+  let nombreBase = nombreNormalizadoFinal || nombreNormalizado || nombreProveedor;
+  
+  // Asegurar que el nombre sea válido
+  if (!nombreBase || nombreBase.length < 2) {
+    console.error(`[obtenerIdProveedor] Nombre de proveedor inválido: ${nombreBase}`);
+    return null;
+  }
+  
+  // Generar un sufijo único para evitar conflictos de nombres
+  // Formato: NOMBRE_ORIGINAL [TIMESTAMP]
+  const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').substring(0, 14);
+  const nombreFinal = `${nombreBase} [${timestamp}]`;
+  
+  console.log(`[obtenerIdProveedor] Nombre base: ${nombreBase}, Nombre final para creación: ${nombreFinal}`);
+  
+  // Verificar si la colección existe
+  try {
+    const colecciones = await fetchAdminFunc(`/api/collections`);
+    const existeColeccion = colecciones.some(c => c.name === 'proveedores');
+    
+    if (!existeColeccion) {
+      console.error('[obtenerIdProveedor] La colección proveedores no existe en PocketBase');
+      return `temp_${nombreNormalizado.replace(/\s+/g, '_').toLowerCase()}_${Date.now()}`;
+    }
+  } catch (error) {
+    console.error('[obtenerIdProveedor] Error al verificar colecciones:', error);
+    // En caso de error, intentar crear el proveedor de todos modos
+  }
+  
+  // Intentar crear el proveedor con múltiples intentos en caso de error
+  const maxIntentos = 3;
+  
+  for (let intento = 1; intento <= maxIntentos; intento++) {
+    try {
+      console.log(`[obtenerIdProveedor] Intento ${intento}/${maxIntentos} de crear proveedor: ${nombreFinal}`);
+      
+      // Antes de crear, verificar una vez más si el proveedor ya existe (para evitar duplicados)
+      try {
+        // Verificación exacta
+        const verificacionFinal = await fetchAdminFunc(`/api/collections/proveedores/records`, {
+          method: 'GET',
+          params: {
+            filter: `nombre="${nombreFinal}"`,
+            sort: "-created",
+            perPage: 5
+          }
+        });
+        
+        if (verificacionFinal.items && verificacionFinal.items.length > 0) {
+          console.log(`[obtenerIdProveedor] Proveedor encontrado en verificación final exacta: ${verificacionFinal.items[0].id} - ${verificacionFinal.items[0].nombre}`);
+          return verificacionFinal.items[0].id;
+        }
+        
+        // Verificación aproximada como último recurso
+        const verificacionFlexible = await fetchAdminFunc(`/api/collections/proveedores/records`, {
+          method: 'GET',
+          params: {
+            filter: `nombre~"${nombreFinal}"`,
+            sort: "-created",
+            perPage: 10
+          }
+        });
+        
+        if (verificacionFlexible.items && verificacionFlexible.items.length > 0) {
+          // Verificar si hay una coincidencia suficientemente buena
+          const nombreNormalizado = nombreFinal.toUpperCase();
+          
+          for (const item of verificacionFlexible.items) {
+            const itemNombre = item.nombre.toUpperCase();
+            
+            // Si los nombres son muy similares, usar el existente
+            if (itemNombre === nombreNormalizado || 
+                itemNombre.includes(nombreNormalizado) || 
+                nombreNormalizado.includes(itemNombre)) {
+              console.log(`[obtenerIdProveedor] Proveedor encontrado en verificación final flexible: ${item.id} - ${item.nombre}`);
+              return item.id;
+            }
+          }
+        }
+        
+        console.log(`[obtenerIdProveedor] No se encontró proveedor en verificación final, procediendo a crear uno nuevo`);
+      } catch (verificacionError) {
+        console.warn(`[obtenerIdProveedor] Error en verificación final:`, verificacionError);
+        // Continuar con la creación aunque falle la verificación
+      }
+      
+      // Preparar los campos básicos
+      const datosProveedor = {
+        nombre: nombreFinal,
+        activo: true,
+        fecha_alta: new Date().toISOString().split('T')[0], // Formato YYYY-MM-DD
+        notas: `Creado automáticamente durante importación el ${new Date().toISOString()}` // Agregar notas para seguimiento
+      };
+      
+      // Intentar crear con JSON
+      console.log(`[obtenerIdProveedor] Enviando datos para crear proveedor:`, JSON.stringify(datosProveedor));
+      
+      // Generar un ID temporal solo para seguimiento en logs
+      const idTemporal = `prov_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+      console.log(`[obtenerIdProveedor] ID temporal generado para seguimiento: ${idTemporal}`);
+      
+      // IMPORTANTE: No incluir un ID personalizado, dejar que PocketBase asigne el suyo
+      const nuevoProveedor = await fetchAdminFunc(`/api/collections/proveedores/records`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(datosProveedor),
+      });
+      
+      // Verificar inmediatamente la respuesta
+      console.log(`[obtenerIdProveedor] Respuesta de creación:`, JSON.stringify(nuevoProveedor));
+      
+      // Verificar la respuesta detalladamente
+      if (nuevoProveedor && nuevoProveedor.id) {
+        console.log(`[obtenerIdProveedor] Nuevo proveedor creado con ID: ${nuevoProveedor.id} - Nombre: ${nuevoProveedor.nombre || nombreFinal}`);
+        
+        // Registrar todos los datos del proveedor creado para depuración
+        console.log(`[obtenerIdProveedor] Datos completos del proveedor creado:`, JSON.stringify(nuevoProveedor));
+        
+        // Verificar que el proveedor se haya creado correctamente consultando de nuevo
+        try {
+          const verificacionCreacion = await fetchAdminFunc(`/api/collections/proveedores/records/${nuevoProveedor.id}`);
+          if (verificacionCreacion && verificacionCreacion.id) {
+            console.log(`[obtenerIdProveedor] Verificación exitosa del nuevo proveedor: ${verificacionCreacion.id} - ${verificacionCreacion.nombre}`);
+            
+            // Guardar el proveedor creado en el registro global para depuración
+            if (!global.proveedoresCreados) global.proveedoresCreados = [];
+            global.proveedoresCreados.push({
+              id: verificacionCreacion.id,
+              nombre: verificacionCreacion.nombre,
+              nombreOriginal: nombreProveedor,
+              timestamp: new Date().toISOString()
+            });
+            
+            console.log(`[obtenerIdProveedor] Total de proveedores creados en esta sesión: ${global.proveedoresCreados.length}`);
+          }
+        } catch (verificacionError) {
+          console.warn(`[obtenerIdProveedor] Error en verificación post-creación:`, verificacionError);
+          // No bloquear el proceso si falla esta verificación
+        }
+        
+        return nuevoProveedor.id;
+      } else {
+              }
+            } catch (verificacionError) {
+              console.warn(`[obtenerIdProveedor] Error en verificación del proveedor creado con FormData:`, verificacionError);
+              // No bloquear el proceso si falla esta verificación
+            }
+            
+            return nuevoProveedorFormData.id;
+          } else {
+            console.error('[obtenerIdProveedor] La respuesta de FormData no contiene un ID válido');
+          }
+        } catch (formDataError) {
+          console.error('[obtenerIdProveedor] Error al crear proveedor con FormData:', formDataError);
+          
+          // Intentar extraer más información del error
+          if (formDataError.response) {
+            try {
+              const errorBody = await formDataError.response.json();
+              console.error('[obtenerIdProveedor] Detalles del error FormData:', JSON.stringify(errorBody));
+            } catch (e) {
+              console.error('[obtenerIdProveedor] No se pudo extraer detalles del error FormData');
+            }
+          }
+        }
+      }
+      
+      // Esperar antes del siguiente intento
+      if (intento < maxIntentos) {
+        const tiempoEspera = 1000 * intento; // Espera progresiva: 1s, 2s, 3s...
+        console.log(`[obtenerIdProveedor] Esperando ${tiempoEspera}ms antes del siguiente intento...`);
+        await new Promise(resolve => setTimeout(resolve, tiempoEspera));
+      }
+    }
+  }
+  
+  // Si todos los intentos fallan, devolver un ID temporal
+  const idTemporal = `temp_${nombreFinal.replace(/\s+/g, '_').toLowerCase()}_${Date.now()}`;
+  console.warn(`[obtenerIdProveedor] No se pudo crear el proveedor después de ${maxIntentos} intentos. Usando ID temporal: ${idTemporal}`);
+  return idTemporal;
+}
+
+/**
+ * Obtiene un proveedor por su nombre
+ * @param {string} nombreProveedor - Nombre del proveedor
+ * @returns {Promise<Object|null>} - Objeto proveedor o null si no existe
+ */
+export async function obtenerProveedorPorNombre(nombreProveedor) {
+  if (!nombreProveedor) return null;
+  
+  // Normalizar el nombre del proveedor
+  const nombreNormalizado = nombreProveedor.trim().toUpperCase();
+  
+  try {
+    const proveedores = await fetchAdmin(`/api/collections/proveedores/records`, {
+      method: 'GET',
+      params: {
+        filter: `nombre~"${nombreNormalizado}"`
+      }
+    });
+    
+    if (proveedores.items && proveedores.items.length > 0) {
+      return proveedores.items[0];
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error al obtener proveedor por nombre:', error);
+    return null;
+  }
+}
+
+/**
+ * Actualiza el estado de una importación
+ * @param {string} importacionId - ID de la importación
+ * @param {string} estado - Nuevo estado
+ * @param {Object} resultado - Resultado de la importación
+ * @returns {Promise<Object>} - Importación actualizada
+ */
+export async function actualizarImportacion(importacionId, estado, resultado) {
+  if (!importacionId) {
+    console.error('No se proporcionó ID de importación para actualizar');
+    return null;
+  }
+  
+  try {
+    const importacionActualizada = await fetchAdmin(`/api/collections/importaciones/records/${importacionId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        estado: estado,
+        resultado: JSON.stringify(resultado),
+        fecha_fin: new Date().toISOString()
+      }),
+    });
+    
+    console.log(`Importación ${importacionId} actualizada a estado: ${estado}`);
+    return importacionActualizada;
+  } catch (error) {
+    console.error('Error al actualizar importación:', error);
+    return null;
+  }
+}
+
+/**
+ * Añade una entrada al log de importación
+ * @param {string} importacionId - ID de la importación
+ * @param {string} mensaje - Mensaje a añadir al log
+ * @returns {Promise<Object>} - Importación actualizada
+ */
+export async function actualizarLog(importacionId, mensaje) {
+  if (!importacionId) {
+    console.error('No se proporcionó ID de importación para actualizar log');
+    return null;
+  }
+  
+  try {
+    // Obtener importación actual
+    let importacion;
+    try {
+      importacion = await fetchAdmin(`/api/collections/importaciones/records/${importacionId}`);
+    } catch (error) {
+      // Si la importación no existe, crearla
+      if (error.message && error.message.includes('404')) {
+        console.log(`Importación ${importacionId} no encontrada, creando registro nuevo`);
+        
+        try {
+          // Crear un archivo temporal para cumplir con el requisito de archivo
+          const tempFilePath = `uploads/temp_${importacionId}.txt`;
+          const fs = await import('fs');
+          await fs.promises.writeFile(tempFilePath, 'Archivo temporal de importación');
+          
+          // Crear la importación con todos los campos requeridos
+          importacion = await fetchAdmin(`/api/collections/importaciones/records`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              id: importacionId,
+              tipo: 'productos',
+              fecha: new Date().toISOString().split('T')[0], // Formato YYYY-MM-DD
+              archivo: tempFilePath,
+              estado: 'pendiente',
+              log: `${new Date().toISOString()}: Importación iniciada\n`
+            })
+          });
+          
+          console.log(`Importación creada con ID: ${importacion.id}`);
+          return importacion;
+        } catch (fsError) {
+          console.error('Error al crear archivo temporal:', fsError);
+          throw fsError;
+        }
+      } else {
+        // Si es otro tipo de error, propagarlo
+        throw error;
+      }
+    }
+    
+    // Añadir mensaje al log
+    const logActual = importacion.log || '';
+    const nuevoLog = `${logActual}${new Date().toISOString()}: ${mensaje}\n`;
+    
+    // Actualizar importación
+    const importacionActualizada = await fetchAdmin(`/api/collections/importaciones/records/${importacionId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        log: nuevoLog
+      })
+    });
+    
+    return importacionActualizada;
+  } catch (error) {
+    console.error('Error al actualizar log:', error);
+    return null;
+  }
+}
+
+/**
+ * Registra una devolución en la base de datos
+ * @param {Object} producto - Producto devuelto
+ * @param {Object} analisisNota - Análisis de la nota de devolución
+ * @param {string} proveedorId - ID del proveedor
+ * @param {string} importacionId - ID de la importación
+ * @returns {Promise<Object>} - Devolución creada
+ */
+export async function registrarDevolucion(producto, analisisNota, proveedorId, importacionId) {
+  try {
+    // Crear registro de devolución
+    const devolucion = await fetchAdmin(`/api/collections/devoluciones/records`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        producto: producto.codigo,
+        nombre_producto: producto.nombre,
+        fecha: new Date().toISOString(),
+        motivo: analisisNota.motivo || 'No especificado',
+        cantidad: analisisNota.cantidad || 1,
+        importe: analisisNota.importe || 0,
+        proveedor: proveedorId,
+        importacion: importacionId,
+        estado: 'pendiente'
+      }),
+    });
+    
+    console.log(`Devolución registrada para producto ${producto.codigo}`);
+    await actualizarLog(importacionId, `Devolución registrada para producto ${producto.codigo}: ${analisisNota.motivo || 'No especificado'}`);
+    
+    return devolucion;
+  } catch (error) {
+    console.error('Error al registrar devolución:', error);
+    await actualizarLog(importacionId, `Error al registrar devolución para producto ${producto.codigo}: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * Importa (crea) un producto en PocketBase
+ * @param {Object} productoData - Datos del producto a importar
+ * @param {Function} fetchAdminFunc - Función para realizar la llamada API a PocketBase
+ * @returns {Promise<Object>} - Producto creado
+ */
+export async function importarProducto(productoData, fetchAdminFunc) {
+  try {
+    // Forzar que stock_actual y unidades_vendidas sean enteros
+    if ('stock_actual' in productoData) productoData.stock_actual = parseInt(productoData.stock_actual, 10) || 0;
+    if ('unidades_vendidas' in productoData) productoData.unidades_vendidas = parseInt(productoData.unidades_vendidas, 10) || 0;
+    console.log(`[IMPORTAR] Enviando producto con stock_actual:`, productoData.stock_actual, 'unidades_vendidas:', productoData.unidades_vendidas);
+    const response = await fetchAdminFunc('/api/collections/productos/records', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(productoData)
+    });
+    console.log(`Producto creado con ID: ${response.id} stock_actual: ${response.stock_actual} unidades_vendidas: ${response.unidades_vendidas}`);
+    return response;
+  } catch (error) {
+    console.error('Error al importar producto:', error);
+    throw error;
+  }
+}
+
+/**
+ * Actualiza un producto en PocketBase
+ * @param {string} productoId - ID del producto a actualizar
+ * @param {Object} productoData - Datos del producto a actualizar
+ * @param {Function} fetchAdminFunc - Función para realizar la llamada API a PocketBase
+ * @returns {Promise<Object>} - Producto actualizado
+ */
+export async function actualizarProducto(productoId, productoData, fetchAdminFunc) {
+  try {
+    // Forzar que stock_actual y unidades_vendidas sean enteros
+    if ('stock_actual' in productoData) productoData.stock_actual = parseInt(productoData.stock_actual, 10) || 0;
+    if ('unidades_vendidas' in productoData) productoData.unidades_vendidas = parseInt(productoData.unidades_vendidas, 10) || 0;
+    console.log(`[ACTUALIZAR] Enviando producto con stock_actual:`, productoData.stock_actual, 'unidades_vendidas:', productoData.unidades_vendidas);
+    const response = await fetchAdminFunc(`/api/collections/productos/records/${productoId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(productoData)
+    });
+    console.log(`Producto actualizado con ID: ${response.id} stock_actual: ${response.stock_actual} unidades_vendidas: ${response.unidades_vendidas}`);
+    return response;
+  } catch (error) {
+    console.error('Error al actualizar producto:', error);
+    throw error;
+  }
+}
+
+/**
+ * Obtiene el ID de una categoría por su nombre
+ * @param {string} nombreCategoria - Nombre de la categoría
+ * @param {Function} fetchAdminFunc - Función para realizar la llamada API a PocketBase
+ * @returns {Promise<string|null>} - ID de la categoría o null si no existe
+ */
+export async function obtenerIdCategoria(nombreCategoria, fetchAdminFunc) {
+  if (!fetchAdminFunc) {
+    console.error(`Error Crítico: fetchAdminFunc no proporcionado a obtenerIdCategoria para ${nombreCategoria}`);
+    return null;
+  }
+  if (!nombreCategoria || typeof nombreCategoria !== 'string' || nombreCategoria.trim() === '') {
+    console.log(`Nombre de categoría no válido o vacío: '${nombreCategoria}'`);
+    return null;
+  }
+  const nombreNormalizado = nombreCategoria.trim();
+  try {
+    console.log(`Buscando en categorías por nombre: '${nombreNormalizado}' usando fetchAdminFunc`);
+    const filtro = encodeURIComponent(`nombre = "${nombreNormalizado.replace(/"/g, '\"')}" `);
+    const urlBusqueda = `/api/collections/categorias/records?filter=${filtro}`;
+    const records = await fetchAdminFunc(urlBusqueda);
+    if (records && records.items && records.items.length > 0) {
+      console.log(`Categoría encontrada con ID: ${records.items[0].id}`);
+      return records.items[0].id;
+    } else {
+      console.log(`Creando nueva categoría: '${nombreNormalizado}' usando fetchAdminFunc`);
+      const urlCreacion = `/api/collections/categorias/records`;
+      const newRecord = await fetchAdminFunc(urlCreacion, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: nombreNormalizado })
+      });
+      if (newRecord && newRecord.id) {
+        console.log(`Nueva categoría creada con ID: ${newRecord.id}`);
+        return newRecord.id;
+      } else {
+        console.error(`No se pudo crear la categoría '${nombreNormalizado}'. Respuesta:`, newRecord);
+        return null;
+      }
+    }
+  } catch (error) {
+    console.error(`Error en obtenerIdCategoria para '${nombreNormalizado}':`, error);
+    if (error.data && error.data.data) {
+      Object.keys(error.data.data).forEach(key => {
+        if (error.data.data[key] && error.data.data[key].message) {
+          console.error(`Detalle del error de PocketBase (campo ${key}): ${error.data.data[key].message}`);
+        }
+      });
+    } else if (error.message) {
+      console.error('Error general en obtenerIdCategoria:', error.message);
+    }
+    return null;
+  }
+}

@@ -18,6 +18,43 @@ export function parserGenericoUniversal(datos, tipo, config = {}) {
     console.warn('[parserGenericoUniversal] Datos vacíos');
     return { productos: [], categorias: [] };
   }
+  
+  // Extraer el nombre del proveedor del config o intentar detectarlo de los datos
+  let nombreProveedor = config.proveedor || 'GENERICO';
+  
+  // Si no se especificó un proveedor, intentar detectarlo de los datos
+  if (nombreProveedor === 'GENERICO' && datos.length > 0) {
+    // Buscar en la primera fila para ver si hay alguna clave que indique el proveedor
+    const primeraFila = datos[0];
+    for (const key in primeraFila) {
+      if (key && typeof key === 'string') {
+        // Verificar si la clave es un nombre de proveedor conocido
+        const keyUpper = key.toUpperCase();
+        if (proveedoresNormalizados[keyUpper]) {
+          nombreProveedor = keyUpper;
+          console.log(`[parserGenericoUniversal] Proveedor detectado automáticamente de la clave: ${nombreProveedor}`);
+          break;
+        }
+        
+        // Verificar si el valor es un nombre de proveedor conocido
+        if (primeraFila[key] && typeof primeraFila[key] === 'string') {
+          const valueUpper = primeraFila[key].toString().toUpperCase();
+          if (proveedoresNormalizados[valueUpper]) {
+            nombreProveedor = valueUpper;
+            console.log(`[parserGenericoUniversal] Proveedor detectado automáticamente del valor: ${nombreProveedor}`);
+            break;
+          }
+        }
+      }
+    }
+  }
+  
+  console.log(`[parserGenericoUniversal] Procesando datos para proveedor: ${nombreProveedor}`);
+  
+  // Normalizar el nombre del proveedor
+  const proveedorNormalizado = nombreProveedor.toUpperCase();
+  // Usar el nombre normalizado del proveedor si existe en el mapa
+  const proveedorFinal = proveedoresNormalizados[proveedorNormalizado] || proveedorNormalizado;
 
   // Variantes de nombres para heurística
   const variantes = {
@@ -264,6 +301,7 @@ export function parserGenericoUniversal(datos, tipo, config = {}) {
       notas: nota || '',
       categoriaExtraidaDelParser: categoriaActual,
       marca: marcaExtraida,
+      proveedor_nombre: proveedorFinal, // Asegurarse de que siempre tenga el proveedor correcto
       datos_origen: JSON.stringify(row)
     };
     // Log para depuración
@@ -316,6 +354,18 @@ export function parserALMCE(datos, tipo) {
 export function parseCecotec(datos, tipo) {
   console.log(`[parseCecotec] Procesando ${datos.length} filas de datos Cecotec`);
   
+  // Verificar si los datos tienen la estructura esperada para Cecotec
+  let tieneEstructuraCecotec = false;
+  if (datos && datos.length > 0) {
+    // Buscar la primera fila que tenga la columna CECOTEC
+    for (let i = 0; i < Math.min(5, datos.length); i++) {
+      if (datos[i] && datos[i]['CECOTEC']) {
+        tieneEstructuraCecotec = true;
+        break;
+      }
+    }
+  }
+  
   // Función para limpiar precios
   const limpiarPrecio = v => {
     if (v === undefined || v === null) return 0;
@@ -323,23 +373,48 @@ export function parseCecotec(datos, tipo) {
     return parseFloat((v || '').toString().replace(/[^0-9,\.]/g, '').replace(',', '.')) || 0;
   };
   
-  // Mapeo específico para Cecotec
-  const colMappings = {
-    codigo: 'CECOTEC',
-    nombre: '__EMPTY_1',
-    unidades: '__EMPTY_2',
-    precio_compra: '__EMPTY_3',
-    descuento: '__EMPTY_4',
-    total_con_descuento: '__EMPTY_5',
-    iva_recargo: '__EMPTY_6',
-    margen: '__EMPTY_7',
-    pvp_web: '__EMPTY_8',
-    pvp_final: '__EMPTY_9',
-    beneficio_unitario: '__EMPTY_11',
-    beneficio_total: '__EMPTY_12',
-    vendidas: '__EMPTY_14',
-    stock_tienda: '__EMPTY_15'
-  };
+  // Detectar automáticamente las columnas basadas en el encabezado
+  const header = datos[0] || {};
+  const colMappings = {};
+  
+  // Buscar columnas por nombre en el encabezado
+  Object.keys(header).forEach(key => {
+    const headerValue = String(header[key] || '').toUpperCase();
+    
+    // Mapear columnas según el texto del encabezado
+    if (headerValue.includes('CÓDIGO') || headerValue.includes('REFERENCIA') || headerValue.includes('REF')) {
+      colMappings.codigo = key;
+    } else if (headerValue.includes('DESCRIPCIÓN') || headerValue.includes('NOMBRE') || headerValue.includes('PRODUCTO')) {
+      colMappings.nombre = key;
+    } else if (headerValue.includes('PRECIO') && headerValue.includes('COMPRA')) {
+      colMappings.precio_compra = key;
+    } else if (headerValue.includes('PVP') || (headerValue.includes('PRECIO') && headerValue.includes('VENTA'))) {
+      colMappings.pvp_final = key;
+    } else if (headerValue.includes('STOCK') || headerValue.includes('UNIDADES')) {
+      colMappings.stock_tienda = key;
+    }
+  });
+  
+  // Si no se detectaron columnas clave, usar el mapeo estático conocido para CECOTEC
+  if (!colMappings.codigo || !colMappings.nombre) {
+    console.log(`[parseCecotec] No se detectaron columnas clave en el encabezado, usando mapeo estático para CECOTEC`);
+    colMappings.codigo = 'CECOTEC';
+    colMappings.nombre = '__EMPTY_1';
+    colMappings.unidades = '__EMPTY_2';
+    colMappings.precio_compra = '__EMPTY_3';
+    colMappings.descuento = '__EMPTY_4';
+    colMappings.total_con_descuento = '__EMPTY_5';
+    colMappings.iva_recargo = '__EMPTY_6';
+    colMappings.margen = '__EMPTY_7';
+    colMappings.pvp_web = '__EMPTY_8';
+    colMappings.pvp_final = '__EMPTY_9';
+    colMappings.beneficio_unitario = '__EMPTY_11';
+    colMappings.beneficio_total = '__EMPTY_12';
+    colMappings.vendidas = '__EMPTY_14';
+    colMappings.stock_tienda = '__EMPTY_15';
+  }
+  
+  console.log(`[parseCecotec] Mapeo de columnas detectado:`, colMappings);
   
   let categoriaActual = null;
   const productos = [];
@@ -424,7 +499,48 @@ export function parseCecotec(datos, tipo) {
  * @returns {Object} - Datos procesados y normalizados con categorías detectadas
  */
 export function parseBSH(datos, tipo) {
-  return parserGenericoUniversal(datos, tipo);
+  console.log(`[parseBSH] Procesando ${datos.length} filas de datos BSH`);
+  
+  // Detectar automáticamente las columnas basadas en el encabezado
+  const header = datos[0] || {};
+  const colMappings = {};
+  
+  // Buscar columnas por nombre en el encabezado
+  Object.keys(header).forEach(key => {
+    const headerValue = String(header[key] || '').toUpperCase();
+    
+    // Mapear columnas según el texto del encabezado
+    if (headerValue.includes('CÓDIGO') || headerValue.includes('REFERENCIA') || headerValue.includes('REF')) {
+      colMappings.codigo = key;
+    } else if (headerValue.includes('DESCRIPCIÓN') || headerValue.includes('NOMBRE') || headerValue.includes('PRODUCTO')) {
+      colMappings.nombre = key;
+    } else if (headerValue.includes('PRECIO') && headerValue.includes('COMPRA')) {
+      colMappings.precio_compra = key;
+    } else if (headerValue.includes('PVP') || (headerValue.includes('PRECIO') && headerValue.includes('VENTA'))) {
+      colMappings.pvp_final = key;
+    } else if (headerValue.includes('STOCK') || headerValue.includes('UNIDADES')) {
+      colMappings.stock_tienda = key;
+    }
+  });
+  
+  console.log(`[parseBSH] Mapeo de columnas detectado:`, colMappings);
+  
+  // Si no se detectaron columnas clave, usar el parser genérico
+  if (!colMappings.codigo || !colMappings.nombre) {
+    console.log(`[parseBSH] No se detectaron columnas clave, usando parser genérico`);
+    return parserGenericoUniversal(datos, tipo);
+  }
+  
+  // Configuración específica para BSH
+  const config = {
+    'CÓDIGO': colMappings.codigo,
+    'DESCRIPCIÓN': colMappings.nombre,
+    'IMPORTE': colMappings.precio_compra,
+    'PVP': colMappings.pvp_final,
+    'TIENDA': colMappings.stock_tienda
+  };
+  
+  return parserGenericoUniversal(datos, tipo, config);
 }
 
 /**
@@ -434,14 +550,55 @@ export function parseBSH(datos, tipo) {
  * @returns {Object} - Datos procesados y normalizados con categorías detectadas
  */
 export function parseJata(datos, tipo) {
+  console.log(`[parseJata] Procesando ${datos.length} filas de datos Jata`);
+  
+  // Detectar automáticamente las columnas basadas en el encabezado
+  const header = datos[0] || {};
+  const colMappings = {};
+  
+  // Buscar columnas por nombre en el encabezado
+  Object.keys(header).forEach(key => {
+    const headerValue = String(header[key] || '').toUpperCase();
+    
+    // Mapear columnas según el texto del encabezado
+    if (headerValue.includes('CÓDIGO') || headerValue.includes('REFERENCIA') || headerValue.includes('REF')) {
+      colMappings.codigo = key;
+    } else if (headerValue.includes('DESCRIPCIÓN') || headerValue.includes('NOMBRE') || headerValue.includes('PRODUCTO')) {
+      colMappings.nombre = key;
+    } else if (headerValue.includes('PRECIO') && headerValue.includes('COMPRA')) {
+      colMappings.precio_compra = key;
+    } else if (headerValue.includes('PVP') || (headerValue.includes('PRECIO') && headerValue.includes('VENTA'))) {
+      colMappings.pvp_final = key;
+    } else if (headerValue.includes('STOCK') || headerValue.includes('UNIDADES')) {
+      colMappings.stock_tienda = key;
+    }
+  });
+  
+  console.log(`[parseJata] Mapeo de columnas detectado:`, colMappings);
+  
+  // Si no se detectaron columnas clave, usar el parser genérico
+  if (!colMappings.codigo || !colMappings.nombre) {
+    console.log(`[parseJata] No se detectaron columnas clave, usando parser genérico`);
+    return parserGenericoUniversal(datos, tipo);
+  }
+  
+  // Configuración específica para Jata
+  const config = {
+    'CÓDIGO': colMappings.codigo,
+    'DESCRIPCIÓN': colMappings.nombre,
+    'IMPORTE': colMappings.precio_compra,
+    'PVP': colMappings.pvp_final,
+    'TIENDA': colMappings.stock_tienda
+  };
+  
   // Usar el parser genérico pero con validación extra de precio_venta
-  const resultado = parserGenericoUniversal(datos, tipo);
+  const resultado = parserGenericoUniversal(datos, tipo, config);
   const productosValidos = [];
   const productosOmitidos = [];
 
   for (const producto of resultado.productos) {
     const precioValido = limpiarPrecio(producto.precio_venta);
-    if (precioValido === null) {
+    if (precioValido === null || precioValido <= 0) {
       console.warn(`[parseJata] Producto omitido por precio_venta inválido: código=${producto.codigo}, nombre=${producto.nombre}, precio_venta=${producto.precio_venta}`);
       productosOmitidos.push(producto);
       continue;
@@ -458,7 +615,6 @@ export function parseJata(datos, tipo) {
   };
 }
 
-
 /**
  * Parser específico para Orbegozo
  * @param {Array} datos - Datos a procesar
@@ -466,7 +622,48 @@ export function parseJata(datos, tipo) {
  * @returns {Object} - Datos procesados y normalizados con categorías detectadas
  */
 export function parseOrbegozo(datos, tipo) {
-  return parserGenericoUniversal(datos, tipo);
+  console.log(`[parseOrbegozo] Procesando ${datos.length} filas de datos Orbegozo`);
+  
+  // Detectar automáticamente las columnas basadas en el encabezado
+  const header = datos[0] || {};
+  const colMappings = {};
+  
+  // Buscar columnas por nombre en el encabezado
+  Object.keys(header).forEach(key => {
+    const headerValue = String(header[key] || '').toUpperCase();
+    
+    // Mapear columnas según el texto del encabezado
+    if (headerValue.includes('CÓDIGO') || headerValue.includes('REFERENCIA') || headerValue.includes('REF')) {
+      colMappings.codigo = key;
+    } else if (headerValue.includes('DESCRIPCIÓN') || headerValue.includes('NOMBRE') || headerValue.includes('PRODUCTO')) {
+      colMappings.nombre = key;
+    } else if (headerValue.includes('PRECIO') && headerValue.includes('COMPRA')) {
+      colMappings.precio_compra = key;
+    } else if (headerValue.includes('PVP') || (headerValue.includes('PRECIO') && headerValue.includes('VENTA'))) {
+      colMappings.pvp_final = key;
+    } else if (headerValue.includes('STOCK') || headerValue.includes('UNIDADES')) {
+      colMappings.stock_tienda = key;
+    }
+  });
+  
+  console.log(`[parseOrbegozo] Mapeo de columnas detectado:`, colMappings);
+  
+  // Si no se detectaron columnas clave, usar el parser genérico
+  if (!colMappings.codigo || !colMappings.nombre) {
+    console.log(`[parseOrbegozo] No se detectaron columnas clave, usando parser genérico`);
+    return parserGenericoUniversal(datos, tipo);
+  }
+  
+  // Configuración específica para Orbegozo
+  const config = {
+    'CÓDIGO': colMappings.codigo,
+    'DESCRIPCIÓN': colMappings.nombre,
+    'IMPORTE': colMappings.precio_compra,
+    'PVP': colMappings.pvp_final,
+    'TIENDA': colMappings.stock_tienda
+  };
+  
+  return parserGenericoUniversal(datos, tipo, config);
 }
 
 /**
@@ -476,7 +673,89 @@ export function parseOrbegozo(datos, tipo) {
  * @returns {Object} - Datos procesados y normalizados con categorías detectadas
  */
 export function parseAlfadyser(datos, tipo) {
-  return parserGenericoUniversal(datos, tipo);
+  console.log(`[parseAlfadyser] Procesando ${datos.length} filas de datos Alfadyser`);
+  
+  // Verificar si los datos tienen la estructura esperada para Alfadyser
+  let tieneEstructuraAlfadyser = false;
+  if (datos && datos.length > 0) {
+    // Buscar la primera fila que tenga la columna ALFADYSER
+    for (let i = 0; i < Math.min(5, datos.length); i++) {
+      if (datos[i] && datos[i]['ALFADYSER']) {
+        tieneEstructuraAlfadyser = true;
+        break;
+      }
+    }
+  }
+  
+  // Si no tiene la estructura esperada, intentar detectar por otras características
+  if (!tieneEstructuraAlfadyser) {
+    // Buscar en el nombre del archivo o en los datos para identificar si es Alfadyser
+    console.log(`[parseAlfadyser] No se detectó estructura estándar de Alfadyser, buscando otras características...`);
+    
+    // Intentar usar el parser genérico con configuración específica para Alfadyser
+    return parserGenericoUniversal(datos, tipo, { proveedor: 'ALFADYSER' });
+  }
+  
+  // Detectar automáticamente las columnas basadas en el encabezado
+  const header = datos[0] || {};
+  const colMappings = {};
+  
+  // Buscar columnas por nombre en el encabezado
+  Object.keys(header).forEach(key => {
+    const headerValue = String(header[key] || '').toUpperCase();
+    
+    // Mapear columnas según el texto del encabezado
+    if (headerValue.includes('CÓDIGO') || headerValue.includes('REFERENCIA') || headerValue.includes('REF')) {
+      colMappings.codigo = key;
+    } else if (headerValue.includes('DESCRIPCIÓN') || headerValue.includes('NOMBRE') || headerValue.includes('PRODUCTO')) {
+      colMappings.nombre = key;
+    } else if (headerValue.includes('PRECIO') && headerValue.includes('COMPRA')) {
+      colMappings.precio_compra = key;
+    } else if (headerValue.includes('PVP') || (headerValue.includes('PRECIO') && headerValue.includes('VENTA'))) {
+      colMappings.pvp_final = key;
+    } else if (headerValue.includes('STOCK') || headerValue.includes('UNIDADES')) {
+      colMappings.stock_tienda = key;
+    }
+  });
+  
+  // Si no se detectaron columnas clave, usar el mapeo estático conocido para ALFADYSER
+  if (!colMappings.codigo || !colMappings.nombre) {
+    console.log(`[parseAlfadyser] No se detectaron columnas clave en el encabezado, usando mapeo estático para ALFADYSER`);
+    colMappings.codigo = 'ALFADYSER';
+    colMappings.nombre = '__EMPTY_1';
+    colMappings.unidades = '__EMPTY_2';
+    colMappings.precio_compra = '__EMPTY_3';
+    colMappings.descuento = '__EMPTY_4';
+    colMappings.recargo = '__EMPTY_5';
+    colMappings.precio_neto = '__EMPTY_6';
+    colMappings.iva_recargo = '__EMPTY_7';
+    colMappings.margen = '__EMPTY_8';
+    colMappings.pvp_final = '__EMPTY_9';
+    colMappings.beneficio_unitario = '__EMPTY_11';
+    colMappings.beneficio_total = '__EMPTY_12';
+    colMappings.vendidas = '__EMPTY_14';
+    colMappings.stock_tienda = '__EMPTY_15';
+  }
+  
+  console.log(`[parseAlfadyser] Mapeo de columnas detectado:`, colMappings);
+  
+  // Configuración específica para Alfadyser
+  const config = {
+    ...colMappings,
+    proveedor: 'ALFADYSER'
+  };
+  
+  const resultado = parserGenericoUniversal(datos, tipo, config);
+  
+  // Asegurarse de que todos los productos tengan el proveedor correcto
+  if (resultado && resultado.productos) {
+    resultado.productos = resultado.productos.map(producto => ({
+      ...producto,
+      proveedor_nombre: 'ALFADYSER'
+    }));
+  }
+  
+  return resultado;
 }
 
 /**
@@ -486,7 +765,48 @@ export function parseAlfadyser(datos, tipo) {
  * @returns {Object} - Datos procesados y normalizados con categorías detectadas
  */
 export function parseVitrokitchen(datos, tipo) {
-  return parserGenericoUniversal(datos, tipo);
+  console.log(`[parseVitrokitchen] Procesando ${datos.length} filas de datos Vitrokitchen`);
+  
+  // Detectar automáticamente las columnas basadas en el encabezado
+  const header = datos[0] || {};
+  const colMappings = {};
+  
+  // Buscar columnas por nombre en el encabezado
+  Object.keys(header).forEach(key => {
+    const headerValue = String(header[key] || '').toUpperCase();
+    
+    // Mapear columnas según el texto del encabezado
+    if (headerValue.includes('CÓDIGO') || headerValue.includes('REFERENCIA') || headerValue.includes('REF')) {
+      colMappings.codigo = key;
+    } else if (headerValue.includes('DESCRIPCIÓN') || headerValue.includes('NOMBRE') || headerValue.includes('PRODUCTO')) {
+      colMappings.nombre = key;
+    } else if (headerValue.includes('PRECIO') && headerValue.includes('COMPRA')) {
+      colMappings.precio_compra = key;
+    } else if (headerValue.includes('PVP') || (headerValue.includes('PRECIO') && headerValue.includes('VENTA'))) {
+      colMappings.pvp_final = key;
+    } else if (headerValue.includes('STOCK') || headerValue.includes('UNIDADES')) {
+      colMappings.stock_tienda = key;
+    }
+  });
+  
+  console.log(`[parseVitrokitchen] Mapeo de columnas detectado:`, colMappings);
+  
+  // Si no se detectaron columnas clave, usar el parser genérico
+  if (!colMappings.codigo || !colMappings.nombre) {
+    console.log(`[parseVitrokitchen] No se detectaron columnas clave, usando parser genérico`);
+    return parserGenericoUniversal(datos, tipo);
+  }
+  
+  // Configuración específica para Vitrokitchen
+  const config = {
+    'CÓDIGO': colMappings.codigo,
+    'DESCRIPCIÓN': colMappings.nombre,
+    'IMPORTE': colMappings.precio_compra,
+    'PVP': colMappings.pvp_final,
+    'TIENDA': colMappings.stock_tienda
+  };
+  
+  return parserGenericoUniversal(datos, tipo, config);
 }
 
 /**
@@ -496,7 +816,48 @@ export function parseVitrokitchen(datos, tipo) {
  * @returns {Object} - Datos procesados y normalizados con categorías detectadas
  */
 export function parseElectrodirecto(datos, tipo) {
-  return parserGenericoUniversal(datos, tipo);
+  console.log(`[parseElectrodirecto] Procesando ${datos.length} filas de datos Electrodirecto`);
+  
+  // Detectar automáticamente las columnas basadas en el encabezado
+  const header = datos[0] || {};
+  const colMappings = {};
+  
+  // Buscar columnas por nombre en el encabezado
+  Object.keys(header).forEach(key => {
+    const headerValue = String(header[key] || '').toUpperCase();
+    
+    // Mapear columnas según el texto del encabezado
+    if (headerValue.includes('CÓDIGO') || headerValue.includes('REFERENCIA') || headerValue.includes('REF')) {
+      colMappings.codigo = key;
+    } else if (headerValue.includes('DESCRIPCIÓN') || headerValue.includes('NOMBRE') || headerValue.includes('PRODUCTO')) {
+      colMappings.nombre = key;
+    } else if (headerValue.includes('PRECIO') && headerValue.includes('COMPRA')) {
+      colMappings.precio_compra = key;
+    } else if (headerValue.includes('PVP') || (headerValue.includes('PRECIO') && headerValue.includes('VENTA'))) {
+      colMappings.pvp_final = key;
+    } else if (headerValue.includes('STOCK') || headerValue.includes('UNIDADES')) {
+      colMappings.stock_tienda = key;
+    }
+  });
+  
+  console.log(`[parseElectrodirecto] Mapeo de columnas detectado:`, colMappings);
+  
+  // Si no se detectaron columnas clave, usar el parser genérico
+  if (!colMappings.codigo || !colMappings.nombre) {
+    console.log(`[parseElectrodirecto] No se detectaron columnas clave, usando parser genérico`);
+    return parserGenericoUniversal(datos, tipo);
+  }
+  
+  // Configuración específica para Electrodirecto
+  const config = {
+    'CÓDIGO': colMappings.codigo,
+    'DESCRIPCIÓN': colMappings.nombre,
+    'IMPORTE': colMappings.precio_compra,
+    'PVP': colMappings.pvp_final,
+    'TIENDA': colMappings.stock_tienda
+  };
+  
+  return parserGenericoUniversal(datos, tipo, config);
 }
 
 /**
@@ -619,6 +980,49 @@ export function parseEasJohnson(datos, tipo) {
   };
 }
 
+// Mapa de nombres normalizados de proveedores con variantes para mejorar la detección
+export const proveedoresNormalizados = {
+  // Proveedores principales con sus variantes
+  'CECOTEC': 'CECOTEC',
+  'CECO': 'CECOTEC',
+  'PVP CECOTEC': 'CECOTEC',
+  'BSH': 'BSH',
+  'PVP BSH': 'BSH',
+  'JATA': 'JATA',
+  'PVP JATA': 'JATA',
+  'ORBEGOZO': 'ORBEGOZO',
+  'OBREGOZO': 'ORBEGOZO', // Corrección de error tipográfico común
+  'PVP ORBEGOZO': 'ORBEGOZO',
+  'ALFADYSER': 'ALFADYSER',
+  'PVP ALFADYSER': 'ALFADYSER',
+  'VITROKITCHEN': 'VITROKITCHEN',
+  'PVP VITROKITCHEN': 'VITROKITCHEN',
+  'ELECTRODIRECTO': 'ELECTRODIRECTO',
+  'PVP ELECTRODIRECTO': 'ELECTRODIRECTO',
+  'ALMCE': 'ALMCE',
+  'PVP ALMCE': 'ALMCE',
+  'ABRILA': 'ABRILA',
+  'PVP ABRILA': 'ABRILA',
+  'AGUACONFORT': 'AGUACONFORT',
+  'PVP AGUACONFORT': 'AGUACONFORT',
+  'AIRPAL': 'AIRPAL',
+  'PVP AIRPAL': 'AIRPAL',
+  'BECKEN': 'BECKEN',
+  'PVP BECKEN': 'BECKEN',
+  'TEGALUXE': 'TEGALUXE',
+  'PVP TEGALUXE': 'TEGALUXE',
+  'EAS': 'EAS-JOHNSON',
+  'JOHNSON': 'EAS-JOHNSON',
+  'EAS-JOHNSON': 'EAS-JOHNSON',
+  'PVP EAS-JOHNSON': 'EAS-JOHNSON',
+  'MIELECTRO': 'MIELECTRO',
+  'PVP MIELECTRO': 'MIELECTRO',
+  'NEVIR': 'NEVIR',
+  'PVP NEVIR': 'NEVIR',
+  'UFESA': 'UFESA',
+  'PVP UFESA': 'UFESA'
+};
+
 // Mapeo de proveedores a sus parsers específicos
 export const proveedorParsers = {
   'ALMCE': parserALMCE,
@@ -632,5 +1036,12 @@ export const proveedorParsers = {
   'ELECTRODIRECTO': parseElectrodirecto,
   'ALMACENES': parseAlmacenes,
   'EAS-JOHNSON': parseEasJohnson,
-  // Añadir más parsers según sea necesario
+  'ABRILA': (datos, tipo) => parserGenericoUniversal(datos, tipo, { proveedor: 'ABRILA' }),
+  'AGUACONFORT': (datos, tipo) => parserGenericoUniversal(datos, tipo, { proveedor: 'AGUACONFORT' }),
+  'AIRPAL': (datos, tipo) => parserGenericoUniversal(datos, tipo, { proveedor: 'AIRPAL' }),
+  'BECKEN': (datos, tipo) => parserGenericoUniversal(datos, tipo, { proveedor: 'BECKEN' }),
+  'TEGALUXE': (datos, tipo) => parserGenericoUniversal(datos, tipo, { proveedor: 'TEGALUXE' }),
+  'MIELECTRO': (datos, tipo) => parserGenericoUniversal(datos, tipo, { proveedor: 'MIELECTRO' }),
+  'NEVIR': (datos, tipo) => parserGenericoUniversal(datos, tipo, { proveedor: 'NEVIR' }),
+  'UFESA': (datos, tipo) => parserGenericoUniversal(datos, tipo, { proveedor: 'UFESA' })
 };

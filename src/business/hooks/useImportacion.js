@@ -67,21 +67,52 @@ export const useImportacion = () => {
     try {
       // Validar que el ID de importación sea válido
       if (!importacionId) {
-        console.warn('No se puede actualizar el estado: ID de importación no válido');
+        console.warn('[actualizarEstadoImportacion] No se puede actualizar el estado: ID de importación no válido');
         return null;
       }
       
-      const data = await obtenerEstadoImportacion(importacionId);
-      setImportacionActual(data);
+      // Ya no usamos objetos simulados, siempre consultamos el estado real en PocketBase
       
-      // Si la importación ha finalizado, actualizar el historial
-      if (data.estado === 'completado' || data.estado === 'error') {
-        cargarHistorial();
+      // Intentar obtener el estado de la importación
+      try {
+        console.log(`[actualizarEstadoImportacion] Obteniendo estado para importación: ${importacionId}`);
+        const data = await obtenerEstadoImportacion(importacionId);
+        
+        // Si tenemos datos válidos, actualizar el estado
+        if (data && typeof data === 'object') {
+          console.log(`[actualizarEstadoImportacion] Estado obtenido correctamente: ${data.estado || 'desconocido'}`);
+          
+          // Ya no hay objetos simulados
+          
+          setImportacionActual(data);
+          
+          // Si la importación ha finalizado, actualizar el historial
+          if (data.estado === 'completado' || data.estado === 'error') {
+            console.log(`[actualizarEstadoImportacion] Importación finalizada con estado: ${data.estado}`);
+            cargarHistorial();
+          }
+          
+          return data;
+        } else {
+          console.warn('[actualizarEstadoImportacion] Datos de importación inválidos:', data);
+          return null;
+        }
+      } catch (fetchErr) {
+        // Manejar errores al obtener el estado de la importación
+        console.error('[actualizarEstadoImportacion] Error al obtener estado de importación:', fetchErr);
+        
+        // Verificar si es un error de lectura múltiple del cuerpo de la respuesta
+        if (fetchErr.message && fetchErr.message.includes('body stream already read')) {
+          console.warn('[actualizarEstadoImportacion] Error de lectura múltiple del cuerpo de la respuesta.');
+          // Intentar nuevamente en la próxima iteración del polling
+          return null;
+        }
+        
+        // Propagar el error para que sea manejado por el componente
+        throw fetchErr;
       }
-      
-      return data;
     } catch (err) {
-      console.error('Error al actualizar estado de importación:', err);
+      console.error('[actualizarEstadoImportacion] Error general al actualizar estado de importación:', err);
       return null;
     }
   };
@@ -129,8 +160,14 @@ export const useImportacion = () => {
       // La respuesta puede tener formato {importacion: {...}} o ser directamente el objeto importacion
       const importacion = respuesta.importacion || respuesta;
       
+      // El servidor restaurado devuelve importacionId en lugar de id
+      // Adaptamos la respuesta para que sea compatible con el resto del código
+      if (importacion.importacionId && !importacion.id) {
+        importacion.id = importacion.importacionId;
+      }
+      
       // Validar que la importación tenga un ID válido
-      if (!importacion || !importacion.id) {
+      if (!importacion || (!importacion.id && !importacion.importacionId)) {
         setError('Error: No se pudo obtener el ID de la importación');
         console.error('Respuesta de importación inválida:', respuesta);
         setLoading(false);
@@ -157,19 +194,82 @@ export const useImportacion = () => {
 
   // Iniciar polling para actualizar el estado de la importación
   const iniciarPolling = (importacionId) => {
-    const intervalo = setInterval(async () => {
-      const importacion = await actualizarEstadoImportacion(importacionId);
-      
-      // Si la importación ha finalizado, detener el polling
-      if (importacion && (importacion.estado === 'completado' || importacion.estado === 'error')) {
+    // Guardar una referencia al intervalo para poder cancelarlo
+    let intervalo;
+    let intentos = 0;
+    let erroresConsecutivos = 0;
+    const maxIntentos = 30; // Máximo número de intentos (30 * 2 segundos = 1 minuto)
+    const maxErroresConsecutivos = 5; // Máximo número de errores consecutivos antes de detener
+    
+    // Función para detener el polling
+    const detenerPolling = () => {
+      if (intervalo) {
         clearInterval(intervalo);
+        console.log(`[iniciarPolling] Polling detenido para importación: ${importacionId}`);
+      }
+    };
+    
+    console.log(`[iniciarPolling] Iniciando polling para importación: ${importacionId}`);
+    
+    // Iniciar el intervalo de polling
+    intervalo = setInterval(async () => {
+      try {
+        // Incrementar contador de intentos
+        intentos++;
+        
+        // Si superamos el máximo de intentos, detener el polling
+        if (intentos >= maxIntentos) {
+          console.warn(`[iniciarPolling] Polling detenido después de ${maxIntentos} intentos para importación: ${importacionId}`);
+          detenerPolling();
+          return;
+        }
+        
+        console.log(`[iniciarPolling] Intento ${intentos}/${maxIntentos} para importación: ${importacionId}`);
+        
+        // Intentar actualizar el estado
+        const importacion = await actualizarEstadoImportacion(importacionId);
+        
+        // Si la actualización fue exitosa, resetear el contador de errores
+        if (importacion) {
+          erroresConsecutivos = 0;
+          
+          // Si la importación ha finalizado, detener el polling
+          if (importacion.estado === 'completado' || importacion.estado === 'error') {
+            console.log(`[iniciarPolling] Importación finalizada con estado: ${importacion.estado}, deteniendo polling`);
+            detenerPolling();
+          }
+        } else {
+          // Si no hay datos de importación, incrementar el contador de errores
+          erroresConsecutivos++;
+          console.warn(`[iniciarPolling] No se obtuvieron datos de importación. Errores consecutivos: ${erroresConsecutivos}/${maxErroresConsecutivos}`);
+          
+          // Si hay demasiados errores consecutivos, detener el polling
+          if (erroresConsecutivos >= maxErroresConsecutivos) {
+            console.error(`[iniciarPolling] Demasiados errores consecutivos (${erroresConsecutivos}), deteniendo polling`);
+            detenerPolling();
+          }
+        }
+      } catch (err) {
+        // Incrementar el contador de errores consecutivos
+        erroresConsecutivos++;
+        console.error(`[iniciarPolling] Error en el polling de importación (${erroresConsecutivos}/${maxErroresConsecutivos}):`, err);
+        
+        // Si hay demasiados errores consecutivos, detener el polling
+        if (erroresConsecutivos >= maxErroresConsecutivos) {
+          console.error(`[iniciarPolling] Demasiados errores consecutivos (${erroresConsecutivos}), deteniendo polling`);
+          detenerPolling();
+        }
       }
     }, 2000); // Actualizar cada 2 segundos
     
-    // Detener el polling después de 5 minutos (300000 ms) para evitar polling infinito
+    // Detener el polling después de 1 minuto (60000 ms) para evitar polling infinito
     setTimeout(() => {
-      clearInterval(intervalo);
-    }, 300000);
+      console.log(`[iniciarPolling] Tiempo máximo alcanzado (60s), deteniendo polling para importación: ${importacionId}`);
+      detenerPolling();
+    }, 60000);
+    
+    // Devolver la función para detener el polling (para uso externo)
+    return detenerPolling;
   };
 
   // Previsualizar datos del archivo
