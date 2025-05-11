@@ -81,10 +81,10 @@ export async function fetchAdmin(endpoint, options = {}) {
 }
 
 /**
- * Obtiene o crea un proveedor en PocketBase y devuelve su ID
+ * Obtiene o crea un proveedor en PocketBase y devuelve su ID y nombre
  * @param {string} nombreProveedor - Nombre del proveedor
  * @param {Function} fetchAdminFunc - Función para realizar peticiones autenticadas a PocketBase
- * @returns {Promise<string|null>} - ID del proveedor o null si no se pudo obtener/crear
+ * @returns {Promise<Object|null>} - Objeto con ID y nombre del proveedor o null si no se pudo obtener/crear
  */
 export async function obtenerIdProveedor(nombreProveedor, fetchAdminFunc = fetchAdmin) {
   if (!nombreProveedor) {
@@ -104,10 +104,13 @@ export async function obtenerIdProveedor(nombreProveedor, fetchAdminFunc = fetch
     
     const resultado = await fetchAdminFunc(urlBusqueda);
     
-    // Si existe, devolver su ID
+    // Si existe, devolver su ID y nombre
     if (resultado && resultado.items && resultado.items.length > 0) {
       console.log(`[obtenerIdProveedor] Proveedor encontrado con ID: ${resultado.items[0].id}`);
-      return resultado.items[0].id;
+      return {
+        id: resultado.items[0].id,
+        nombre: nombreNormalizado
+      };
     }
     
     // Si no existe, crearlo
@@ -124,7 +127,10 @@ export async function obtenerIdProveedor(nombreProveedor, fetchAdminFunc = fetch
     });
     
     console.log(`[obtenerIdProveedor] Nuevo proveedor creado con ID: ${nuevoProveedor.id}`);
-    return nuevoProveedor.id;
+    return {
+      id: nuevoProveedor.id,
+      nombre: nombreNormalizado
+    };
   } catch (error) {
     console.error(`[obtenerIdProveedor] Error al obtener/crear proveedor "${nombreNormalizado}":`, error);
     
@@ -155,7 +161,10 @@ export async function obtenerIdProveedor(nombreProveedor, fetchAdminFunc = fetch
           // No bloquear el proceso si falla esta verificación
         }
         
-        return nuevoProveedorFormData.id;
+        return {
+          id: nuevoProveedorFormData.id,
+          nombre: nombreNormalizado
+        };
       } else {
         console.error('[obtenerIdProveedor] La respuesta de FormData no contiene un ID válido');
         return null;

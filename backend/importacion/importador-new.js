@@ -214,13 +214,19 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, fetch
   try {
     // 1. Obtener/Crear ID del PROVEEDOR PRINCIPAL
     let idProveedorPrincipal = null;
+    let nombreProveedorPrincipal = null;
     if (proveedorNombre) {
-      console.log(`Resolviendo ID para el proveedor principal: ${proveedorNombre}`);
-      idProveedorPrincipal = await dbUtils.obtenerIdProveedor(proveedorNombre, fetchAdminFunc);
-      if (!idProveedorPrincipal) {
-        console.warn(`No se pudo resolver/crear ID para el proveedor ${proveedorNombre}`);
-      } else {
-        console.log(`ID del proveedor principal resuelto: ${idProveedorPrincipal}`);
+      try {
+        const resultadoProveedor = await dbUtils.obtenerIdProveedor(proveedorNombre, fetchAdminFunc);
+        if (resultadoProveedor) {
+          idProveedorPrincipal = resultadoProveedor.id;
+          nombreProveedorPrincipal = resultadoProveedor.nombre;
+          console.log(`Proveedor principal resuelto: ${proveedorNombre} -> ID: ${idProveedorPrincipal}, Nombre: ${nombreProveedorPrincipal}`);
+        } else {
+          console.warn(`No se pudo resolver el proveedor principal: ${proveedorNombre}`);
+        }
+      } catch (error) {
+        console.error(`Error al resolver proveedor principal ${proveedorNombre}:`, error);
       }
     }
     
@@ -331,6 +337,7 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, fetch
         // ASIGNAR PROVEEDOR PRINCIPAL (si se resolvió)
         if (idProveedorPrincipal) {
           productoBase.proveedor = idProveedorPrincipal;
+          productoBase.nombre_proveedor = nombreProveedorPrincipal;
         } else {
             // Opcional: registrar si no hay proveedor principal aunque se esperase
             if(proveedorNombre) { // Si se esperaba un proveedor pero no se resolvió su ID
@@ -346,7 +353,8 @@ async function importarABaseDeDatos(datos, proveedorNombre, importacionId, fetch
           // Producto existe, actualizarlo
           const productoActualizado = { ...productoBase, // Asegurar campos actualizados
             categoria: existentes.items[0].categoria || null, // Mantener relación categoría existente si aplicable
-            proveedor: existentes.items[0].proveedor || null
+            proveedor: existentes.items[0].proveedor || null,
+            nombre_proveedor: existentes.items[0].nombre_proveedor || nombreProveedorPrincipal || null
           };
           await dbUtils.actualizarProducto(existentes.items[0].id, productoActualizado, fetchAdminFunc);
           stats.actualizados++;
