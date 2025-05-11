@@ -11,7 +11,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import fetch from 'node-fetch';
 import FormData from 'form-data';
-import { importarDatos } from './importador-new.js';
+import { importarDatos } from './core/index.js';
 import { serverConfig } from './config.js';
 import { pocketbaseConfig } from './config.js';
 import { autenticarAdmin } from './utils.js';
@@ -172,7 +172,7 @@ app.post('/importar', upload.single('archivo'), async (req, res) => {
           console.error(`Error en la importación ${importacionId}:`, error);
           // Intentar actualizar el estado de la importación a 'error'
           try {
-            import('./db-utils.js').then(({ actualizarImportacion }) => {
+            import('./db/index.js').then(({ actualizarImportacion }) => {
               actualizarImportacion(importacionId, 'error', { error: error.message || 'Error desconocido' });
             }).catch(importError => {
               console.error(`Error al importar actualizarImportacion: ${importError}`);

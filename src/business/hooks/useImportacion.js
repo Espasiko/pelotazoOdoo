@@ -31,6 +31,14 @@ export const useImportacion = () => {
     { id: 'VITROKITCHEN', nombre: 'VITROKITCHEN' },
     { id: 'ELECTRODIRECTO', nombre: 'ELECTRODIRECTO' },
     { id: 'ALMCE', nombre: 'ALMCE' },
+    { id: 'ABRILA', nombre: 'ABRILA' },
+    { id: 'AGUACONFORT', nombre: 'AGUACONFORT' },
+    { id: 'BECKEN', nombre: 'BECKEN' },
+    { id: 'TEGALUXE', nombre: 'TEGALUXE' },
+    { id: 'EAS-JOHNSON', nombre: 'EAS-JOHNSON' },
+    { id: 'UFESA', nombre: 'UFESA' },
+    { id: 'NEVIR', nombre: 'NEVIR' },
+    { id: 'MIELECTRO', nombre: 'MIELECTRO' },
     // { id: 'ALMACENES', nombre: 'ALMACENES (Alternativo)' }, // Ocultamos la alternativa para evitar confusión
     { id: 'GENERICO', nombre: 'Genérico (Otros proveedores)' }
   ];

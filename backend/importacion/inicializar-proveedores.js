@@ -5,7 +5,7 @@
 
 import { pocketbaseConfig } from './config.js';
 import { autenticarAdmin } from './utils.js';
-import { fetchAdmin } from './db-utils.js';
+import { fetchAdmin } from './db/client.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';

@@ -3,7 +3,7 @@
  * Este módulo maneja la detección, creación y asignación de categorías
  */
 
-import { fetchAdmin } from './utils.js';
+import { fetchAdmin, get, post } from './db/client.js';
 
 // Categorías predefinidas para productos
 const CATEGORIAS_PREDEFINIDAS = [

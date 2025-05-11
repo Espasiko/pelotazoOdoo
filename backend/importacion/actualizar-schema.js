@@ -5,7 +5,7 @@
 
 import { pocketbaseConfig } from './config.js';
 import { autenticarAdmin } from './utils.js';
-import { fetchAdmin } from './db-utils.js';
+import { fetchAdmin } from './db/client.js';
 
 /**
  * Añade el campo nombre_proveedor a la colección de productos

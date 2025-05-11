@@ -8,7 +8,7 @@ import cors from 'cors';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { importarDatos } from './importador-new.js';
+import { importarDatos } from './core/index.js';
 import { serverConfig } from './config.js';
 
 // Configuración de ES modules

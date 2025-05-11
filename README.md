@@ -23,12 +23,17 @@ Este proyecto implementa una solución completa para la tienda "El Pelotazo", in
 
 ```
 /
-├── frontend/           # Aplicación React con Refine
-│   ├── admin/          # Panel de administración
+│── frontend/           # Aplicación React con Refine
+│   │── admin/          # Panel de administración
 │   └── tienda/         # Tienda online
-├── backend/            # Backend con PocketBase
-│   ├── pb_data/        # Datos de PocketBase
-│   └── pb_migrations/  # Migraciones de PocketBase
+│── backend/            # Backend con PocketBase
+│   │── pb_data/        # Datos de PocketBase
+│   │── pb_migrations/  # Migraciones de PocketBase
+│   └── importacion/    # Sistema de importación de datos
+│       │── core/        # Lógica principal de importación
+│       │── db/          # Interacción con PocketBase
+│       │── parsers/     # Parsers para diferentes proveedores
+│       └── scripts/     # Scripts de actualización
 └── docs/              # Documentación
 ```
 
@@ -45,9 +50,20 @@ Este proyecto implementa una solución completa para la tienda "El Pelotazo", in
 3. Iniciar el servidor de desarrollo: `npm run dev`
 4. Iniciar PocketBase: `cd backend && ./pocketbase serve`
 
-## Migración de Datos
+## Migración e Importación de Datos
 
 El sistema incluye una herramienta de migración para importar datos desde los archivos Excel existentes. Acceda a esta funcionalidad desde el panel de administración en la sección "Migración".
+
+### Sistema de Importación
+
+El sistema de importación ha sido refactorizado con una arquitectura modular para mejorar su mantenibilidad:
+
+- **Core**: Contiene la lógica principal de importación, procesamiento de archivos e importación a la base de datos.
+- **DB**: Módulos para interactuar con PocketBase, gestionando proveedores, productos, categorías e importaciones.
+- **Parsers**: Parsers específicos para diferentes proveedores, con un parser genérico universal para formatos no estandarizados.
+- **Scripts**: Scripts de actualización y mantenimiento del sistema.
+
+Para importar datos, puede usar el servidor de importación que se ejecuta en el puerto 3100 o utilizar directamente las funciones del módulo `core`.
 
 ## Backup Automático
 

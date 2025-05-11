@@ -5,7 +5,7 @@
 
 import { pocketbaseConfig } from './config.js';
 import { autenticarAdmin, fetchAdmin } from './utils.js';
-import { proveedoresNormalizados as proveedoresNormalizadosParser } from './parsers.js';
+import { proveedoresNormalizados as proveedoresNormalizadosParser } from './parsers/providers-map.js';
 
 // Variable global para rastrear proveedores creados en esta sesión
 if (!global.proveedoresCreados) global.proveedoresCreados = [];
