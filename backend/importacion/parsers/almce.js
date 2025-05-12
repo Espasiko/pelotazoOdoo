@@ -33,13 +33,31 @@ export function parserALMCE(datos, tipo, config = {}) {
   const header = datos[0] || {};
   const colMappings = {};
   
-  // Mapeo conocido para ALMCE
-  colMappings.codigo = 'REFERENCIA';
-  colMappings.nombre = 'DESCRIPCION';
-  colMappings.precio_compra = 'COSTE';
-  colMappings.pvp = 'PVP';
-  colMappings.stock = 'STOCK';
-  colMappings.marca = 'MARCA';
+  // Verificar si estamos ante el formato con MICROONDAS y __EMPTY_X
+  if (header['MICROONDAS'] && header['__EMPTY_1']) {
+    console.log('[parserALMCE] Detectado formato especial con MICROONDAS y __EMPTY_X');
+    colMappings.codigo = 'MICROONDAS';
+    colMappings.nombre = '__EMPTY_1';
+    colMappings.unidades = '__EMPTY_2';
+    colMappings.precio_compra = '__EMPTY_3'; // IMPORTE BRUTO
+    colMappings.descuento = '__EMPTY_4'; // DTO
+    colMappings.iva = '__EMPTY_5'; // IVA 21% + RECARGO 5,2%
+    colMappings.precio_margen = '__EMPTY_6'; // PRECIO CON MARGEN 25%
+    colMappings.pvp_web = '__EMPTY_7'; // P.V.P WEB
+    colMappings.pvp = '__EMPTY_8'; // P.V.P FINAL CLIENTE
+    colMappings.vendidas = '__EMPTY_10'; // VENDIDAS
+    colMappings.stock = '__EMPTY_11'; // QUEDAN EN TIENDA
+    colMappings.beneficio_unitario = '__EMPTY_13'; // BENEFICIO UNITARIO
+    colMappings.beneficio_total = '__EMPTY_14'; // BENEFICIO TOTAL
+  } else {
+    // Mapeo conocido estándar para ALMCE
+    colMappings.codigo = 'REFERENCIA';
+    colMappings.nombre = 'DESCRIPCION';
+    colMappings.precio_compra = 'COSTE';
+    colMappings.pvp = 'PVP';
+    colMappings.stock = 'STOCK';
+    colMappings.marca = 'MARCA';
+  }
   
   // Procesar cada fila
   const productos = [];
@@ -66,7 +84,14 @@ export function parserALMCE(datos, tipo, config = {}) {
     const codigo = row[colMappings.codigo];
     const nombre = row[colMappings.nombre];
     
+    // Ignorar la fila de encabezados si se detecta
+    if (codigo === 'CÓDIGO' || codigo === 'REFERENCIA' || codigo === 'MICROONDAS' && nombre === 'DESCRIPCIÓN') {
+      console.log('[parserALMCE] Ignorando fila de encabezados');
+      continue;
+    }
+    
     if (!codigo || !nombre) {
+      console.log(`[parserALMCE] Ignorando fila sin código o nombre: ${JSON.stringify(row)}`);
       continue; // No es un producto válido
     }
     
@@ -88,10 +113,11 @@ export function parserALMCE(datos, tipo, config = {}) {
       nombre: String(nombre),
       descripcion: String(nombre),
       precio_compra: limpiarPrecio(row[colMappings.precio_compra]),
-      precio_venta: limpiarPrecio(row[colMappings.pvp]),
+      precio_venta: row[colMappings.pvp] ? limpiarPrecio(row[colMappings.pvp]) : 
+                   (row[colMappings.pvp_web] ? limpiarPrecio(row[colMappings.pvp_web]) : 0),
       stock_actual: parseInt(row[colMappings.stock] || 0, 10),
       marca: marca,
-      categoriaExtraidaDelParser: categoriaActual,
+      categoriaExtraidaDelParser: categoriaActual || 'MICROONDAS', // Usar MICROONDAS como categoría por defecto si no hay otra
       proveedor_nombre: 'ALMCE',
       nombre_proveedor: 'ALMCE',
       iva: 21, // Valor por defecto para IVA
