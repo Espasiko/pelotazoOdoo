@@ -100,6 +100,8 @@ class PelotazoController(http.Controller):
                     'x_dto': product.x_dto if hasattr(product, 'x_dto') else 0,
                     'x_precio_margen': product.x_precio_margen if hasattr(product, 'x_precio_margen') else 0,
                     'x_beneficio_unitario': product.x_beneficio_unitario if hasattr(product, 'x_beneficio_unitario') else 0,
+                    'x_nombre_proveedor': product.x_nombre_proveedor if hasattr(product, 'x_nombre_proveedor') else '',
+                    'x_marca': product.x_marca if hasattr(product, 'x_marca') else '',
                 })
             
             return self._http_json_response({'success': True, 'data': result}, headers=headers)
@@ -134,6 +136,8 @@ class PelotazoController(http.Controller):
                 'x_dto': product.x_dto if hasattr(product, 'x_dto') else 0,
                 'x_precio_margen': product.x_precio_margen if hasattr(product, 'x_precio_margen') else 0,
                 'x_beneficio_unitario': product.x_beneficio_unitario if hasattr(product, 'x_beneficio_unitario') else 0,
+                'x_nombre_proveedor': product.x_nombre_proveedor if hasattr(product, 'x_nombre_proveedor') else '',
+                'x_marca': product.x_marca if hasattr(product, 'x_marca') else '',
             }
             
             return self._http_json_response({'success': True, 'data': result}, headers=headers)

@@ -8,7 +8,7 @@ class ProductTemplate(models.Model):
     x_precio_margen = fields.Float(string='Precio con margen')
     x_beneficio_unitario = fields.Float(string='Beneficio unitario', compute='_compute_beneficio', store=True)
     x_beneficio_total = fields.Float(string='Beneficio total', compute='_compute_beneficio', store=True)
-    x_nombre_proveedor = fields.Char(string='Proveedor')
+    x_nombre_proveedor = fields.Char(string='Proveedor', help='Nombre del proveedor del producto')
     x_marca = fields.Char(string='Marca')
     x_vendidas = fields.Integer(string='Unidades vendidas')
     
