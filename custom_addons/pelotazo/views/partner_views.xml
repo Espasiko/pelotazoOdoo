@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Añadir campos personalizados a la vista de formulario de proveedor -->
+        <record id="view_partner_form_pelotazo" model="ir.ui.view">
+            <field name="name">res.partner.form.pelotazo</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="base.view_partner_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//page[@name='sales_purchases']//group[@name='purchase']" position="inside">
+                    <field name="x_fecha_alta"/>
+                    <field name="x_activo_proveedor"/>
+                    <field name="x_codigo_proveedor"/>
+                    <field name="x_notas_proveedor"/>
+                </xpath>
+            </field>
+        </record>
+
+        <!-- Añadir campos personalizados a la vista de lista de proveedores -->
+        <record id="view_partner_tree_pelotazo" model="ir.ui.view">
+            <field name="name">res.partner.tree.pelotazo</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="base.view_partner_tree"/>
+            <field name="arch" type="xml">
+                <field name="complete_name" position="after">
+                    <field name="x_codigo_proveedor" optional="show"/>
+                    <field name="x_activo_proveedor" optional="show"/>
+                </field>
+            </field>
+        </record>
+
+        <!-- Añadir campos personalizados a la vista de búsqueda de proveedores -->
+        <record id="view_res_partner_filter_pelotazo" model="ir.ui.view">
+            <field name="name">res.partner.select.pelotazo</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="base.view_res_partner_filter"/>
+            <field name="arch" type="xml">
+                <field name="name" position="after">
+                    <field name="x_codigo_proveedor"/>
+                </field>
+                <filter name="supplier" position="after">
+                    <filter string="Proveedores activos" name="activo_proveedor" domain="[('x_activo_proveedor', '=', True)]"/>
+                </filter>
+            </field>
+        </record>
+    </data>
+</odoo>

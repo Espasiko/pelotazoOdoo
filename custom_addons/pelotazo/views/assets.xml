@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Nota: En Odoo 18, los assets se definen principalmente en el __manifest__.py -->
+    <!-- Este archivo se mantiene para compatibilidad, pero los estilos principales se cargan desde el manifest -->
+    
+    <!-- Template para la tienda online que se carga directamente -->
+    <template id="pelotazo_shop_layout" inherit_id="website_sale.products" active="True">
+        <xpath expr="//div[hasclass('o_wsale_products_main_row')]" position="before">
+            <div class="pelotazo-banner" style="background-color: #e30613; color: white; text-align: center; padding: 10px; font-weight: bold;">
+                Bienvenido a la tienda online de El Pelotazo - ¡Los mejores electrodomésticos al mejor precio!
+            </div>
+        </xpath>
+    </template>
+</odoo>

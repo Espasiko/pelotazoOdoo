@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../windows-projects/pelotanew"
+		}
+	],
+	"settings": {
+		"terminal.integrated.sendKeybindingsToShell": false,
+		"terminal.integrated.allowChords": false
+	}
+}

@@ -1,0 +1,211 @@
+/* Tema personalizado para El Pelotazo - Panel de Administración en modo oscuro */
+
+/* Variables de colores */
+:root {
+    --pelotazo-dark-bg: #0d1117;
+    --pelotazo-dark-secondary: #161b22;
+    --pelotazo-dark-hover: #21262d;
+    --pelotazo-text-light: #f0f6fc;
+    --pelotazo-accent: #58a6ff;
+    --pelotazo-success: #238636;
+    --pelotazo-warning: #f0883e;
+    --pelotazo-danger: #f53329;
+    --pelotazo-border: #30363d;
+}
+
+/* Estilos generales */
+body.o_web_client {
+    background-color: var(--pelotazo-dark-bg);
+    color: var(--pelotazo-text-light);
+}
+
+/* Barra de navegación superior */
+.o_main_navbar {
+    background-color: var(--pelotazo-dark-secondary) !important;
+    border-bottom: 1px solid var(--pelotazo-border);
+}
+
+.o_main_navbar .dropdown-toggle,
+.o_main_navbar .o_menu_brand,
+.o_main_navbar .o_menu_sections,
+.o_main_navbar .o_menu_systray {
+    color: var(--pelotazo-text-light) !important;
+}
+
+.o_main_navbar .dropdown-toggle:hover,
+.o_main_navbar .o_menu_sections > a:hover {
+    background-color: var(--pelotazo-dark-hover) !important;
+}
+
+/* Menú lateral */
+.o_menu_apps {
+    background-color: var(--pelotazo-dark-secondary) !important;
+}
+
+.o_app {
+    background-color: var(--pelotazo-dark-secondary) !important;
+}
+
+.o_app:hover {
+    background-color: var(--pelotazo-dark-hover) !important;
+}
+
+/* Contenido principal */
+.o_content {
+    background-color: var(--pelotazo-dark-bg) !important;
+}
+
+/* Tarjetas y paneles */
+.o_form_view,
+.o_list_view,
+.o_kanban_view,
+.o_kanban_record,
+.o_form_sheet,
+.o_form_statusbar,
+.table-responsive,
+.o_dashboard {
+    background-color: var(--pelotazo-dark-secondary) !important;
+    color: var(--pelotazo-text-light) !important;
+    border-color: var(--pelotazo-border) !important;
+}
+
+/* Dashboard cards como en la imagen */
+.o_dashboard .card {
+    background-color: var(--pelotazo-dark-secondary) !important;
+    border: 1px solid var(--pelotazo-border) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+}
+
+.o_dashboard .card-header {
+    background-color: transparent !important;
+    border-bottom: 1px solid var(--pelotazo-border) !important;
+    color: var(--pelotazo-text-light) !important;
+    font-weight: bold !important;
+}
+
+/* Botones */
+.btn-primary {
+    background-color: var(--pelotazo-accent) !important;
+    border-color: var(--pelotazo-accent) !important;
+    color: var(--pelotazo-text-light) !important;
+}
+
+.btn-secondary {
+    background-color: var(--pelotazo-dark-hover) !important;
+    border-color: var(--pelotazo-border) !important;
+    color: var(--pelotazo-text-light) !important;
+}
+
+/* Encabezados */
+.o_form_sheet_bg {
+    background-color: var(--pelotazo-dark-bg) !important;
+}
+
+/* Campos de entrada */
+.o_field_widget input,
+.o_field_widget textarea,
+.o_field_widget select {
+    background-color: var(--pelotazo-dark-hover) !important;
+    color: var(--pelotazo-text-light) !important;
+    border: 1px solid var(--pelotazo-border) !important;
+}
+
+/* Tablas */
+.o_list_view thead {
+    background-color: var(--pelotazo-dark-hover) !important;
+}
+
+.o_list_view tbody tr:hover {
+    background-color: var(--pelotazo-dark-hover) !important;
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+/* Iconos y badges */
+.badge-primary, .badge-info {
+    background-color: var(--pelotazo-accent) !important;
+}
+
+/* Estado crítico (similar a los indicadores "Crítico" en la imagen) */
+.badge-danger, .text-danger, .o_status_critical {
+    background-color: var(--pelotazo-danger) !important;
+    color: var(--pelotazo-text-light) !important;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+/* Estado bajo (similar a los indicadores "Bajo" en la imagen) */
+.badge-warning, .text-warning, .o_status_warning {
+    background-color: var(--pelotazo-warning) !important;
+    color: var(--pelotazo-text-light) !important;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+/* Estadísticas en dashboard */
+.o_dashboard .o_stat {
+    color: var(--pelotazo-text-light) !important;
+}
+
+.o_dashboard .o_stat_value {
+    font-size: 24px !important;
+    font-weight: bold !important;
+}
+
+.o_dashboard .o_stat_text {
+    font-size: 14px !important;
+}
+
+/* Personalización de la página de inicio */
+.o_home_menu {
+    background-color: var(--pelotazo-dark-bg) !important;
+}
+
+.o_app_icon {
+    border-radius: 8px !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Menú lateral como en la imagen */
+.o_menu_sections {
+    background-color: var(--pelotazo-dark-secondary) !important;
+}
+
+.nav-item a {
+    color: var(--pelotazo-text-light) !important;
+}
+
+.nav-item a:hover {
+    background-color: var(--pelotazo-dark-hover) !important;
+}
+
+.nav-item.active a {
+    background-color: var(--pelotazo-dark-hover) !important;
+    border-left: 3px solid var(--pelotazo-accent) !important;
+}
+
+/* Personalización específica para el dashboard de El Pelotazo */
+.dashboard-title {
+    font-size: 24px !important;
+    font-weight: bold !important;
+    color: var(--pelotazo-text-light) !important;
+    margin-bottom: 20px !important;
+}
+
+.dashboard-welcome {
+    font-size: 14px !important;
+    color: #aaa !important;
+    margin-bottom: 30px !important;
+}
+
+/* Colores para los indicadores de crecimiento */
+.growth-positive {
+    color: #4caf50 !important;
+}
+
+.growth-negative {
+    color: var(--pelotazo-danger) !important;
+}

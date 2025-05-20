@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Añadir campos a la vista de formulario de producto -->
+    <record id="pelotazo_product_template_form_view" model="ir.ui.view">
+        <field name="name">pelotazo.product.template.form.view</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='general_information']" position="after">
+                <page string="El Pelotazo" name="pelotazo">
+                    <group>
+                        <group string="Información de Venta">
+                            <field name="x_pvp_web"/>
+                            <field name="x_dto"/>
+                            <field name="x_precio_margen"/>
+                            <field name="x_beneficio_unitario"/>
+                            <field name="x_beneficio_total"/>
+                            <field name="x_vendidas"/>
+                        </group>
+                        <group string="Información de Proveedor">
+                            <field name="x_nombre_proveedor"/>
+                            <field name="x_marca"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Añadir campos a la vista de árbol de producto -->
+    <record id="pelotazo_product_template_tree_view" model="ir.ui.view">
+        <field name="name">pelotazo.product.template.tree.view</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_tree_view"/>
+        <field name="arch" type="xml">
+            <field name="list_price" position="after">
+                <field name="x_pvp_web" optional="show"/>
+                <field name="x_marca" optional="show"/>
+                <field name="x_nombre_proveedor" optional="show"/>
+                <field name="x_beneficio_unitario" optional="show"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- Añadir campos a la vista de búsqueda de producto -->
+    <record id="pelotazo_product_template_search_view" model="ir.ui.view">
+        <field name="name">pelotazo.product.template.search.view</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_search_view"/>
+        <field name="arch" type="xml">
+            <field name="name" position="after">
+                <field name="x_marca"/>
+                <field name="x_nombre_proveedor"/>
+            </field>
+            <filter name="categ_id" position="after">
+                <filter string="Marca" name="marca" context="{'group_by': 'x_marca'}"/>
+                <filter string="Proveedor" name="proveedor" context="{'group_by': 'x_nombre_proveedor'}"/>
+            </filter>
+        </field>
+    </record>
+</odoo>

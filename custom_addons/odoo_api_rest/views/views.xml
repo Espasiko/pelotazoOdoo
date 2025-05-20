@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Este archivo puede contener vistas personalizadas si las necesitamos -->
+    <!-- Por ahora, no necesitamos crear vistas adicionales, ya que estamos utilizando -->
+    <!-- los modelos estándar de Odoo y solo exponiendo una API REST -->
+</odoo>
