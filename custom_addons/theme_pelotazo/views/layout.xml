@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Personalización del encabezado del sitio -->
+    <template id="theme_pelotazo_layout" inherit_id="website.layout" name="Theme El Pelotazo Layout">
+        <xpath expr="//header" position="attributes">
+            <attribute name="class" add="o_pelotazo_header" separator=" "/>
+        </xpath>
+        
+        <!-- Personalización del pie de página -->
+        <xpath expr="//footer" position="attributes">
+            <attribute name="class" add="o_pelotazo_footer" separator=" "/>
+        </xpath>
+    </template>
+    
+    <!-- Personalización de la página de productos -->
+    <template id="theme_pelotazo_products" inherit_id="website_sale.products" name="Theme El Pelotazo Products">
+        <xpath expr="//div[hasclass('oe_website_sale')]" position="attributes">
+            <attribute name="class" add="o_pelotazo_products" separator=" "/>
+        </xpath>
+    </template>
+</odoo>

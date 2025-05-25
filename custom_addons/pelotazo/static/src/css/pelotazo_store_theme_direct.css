@@ -1,0 +1,117 @@
+/* Estilos personalizados para la tienda de El Pelotazo */
+
+/* Colores principales */
+:root {
+    --pelotazo-primary: #0056b3;
+    --pelotazo-secondary: #e63946;
+    --pelotazo-accent: #ffd166;
+    --pelotazo-light: #f8f9fa;
+    --pelotazo-dark: #212529;
+}
+
+/* Encabezado */
+header {
+    background-color: var(--pelotazo-primary);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+header .navbar-brand img {
+    max-height: 50px;
+}
+
+/* Botones */
+.btn-primary {
+    background-color: var(--pelotazo-primary);
+    border-color: var(--pelotazo-primary);
+}
+
+.btn-primary:hover, .btn-primary:focus {
+    background-color: #004494;
+    border-color: #004494;
+}
+
+.btn-secondary {
+    background-color: var(--pelotazo-secondary);
+    border-color: var(--pelotazo-secondary);
+}
+
+.btn-secondary:hover, .btn-secondary:focus {
+    background-color: #d12a38;
+    border-color: #d12a38;
+}
+
+/* Tarjetas de productos */
+.oe_product {
+    border: 1px solid #eee;
+    border-radius: 8px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.oe_product:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.oe_product .product_price {
+    color: var(--pelotazo-secondary);
+    font-weight: bold;
+}
+
+/* Página de producto */
+#product_detail {
+    padding: 20px;
+    background-color: var(--pelotazo-light);
+    border-radius: 8px;
+}
+
+#product_detail h1 {
+    color: var(--pelotazo-primary);
+    margin-bottom: 20px;
+}
+
+/* Carrito de compra */
+#cart_products {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+#cart_products th {
+    background-color: var(--pelotazo-primary);
+    color: white;
+}
+
+/* Pie de página */
+footer {
+    background-color: var(--pelotazo-dark);
+    color: white;
+    padding: 30px 0;
+}
+
+/* Etiquetas de descuento */
+.o_ribbon_left {
+    background-color: var(--pelotazo-secondary);
+}
+
+/* Barra de búsqueda */
+.search-query {
+    border-radius: 20px;
+    border: 1px solid #ddd;
+    padding-left: 15px;
+}
+
+/* Categorías */
+.category-name {
+    color: var(--pelotazo-primary);
+    font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .oe_product {
+        margin-bottom: 15px;
+    }
+    
+    #product_detail {
+        padding: 10px;
+    }
+}
