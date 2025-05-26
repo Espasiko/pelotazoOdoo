@@ -1,0 +1,15 @@
+{
+  "name": "fastapi_middleware",
+  "version": "1.0.0",
+  "description": "Este proyecto implementa una capa de middleware utilizando FastAPI para mejorar la comunicación entre el frontend Next.js y el backend Odoo de la tienda de electrodomésticos El Pelotazo.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^6.8.2"
+  }
+}

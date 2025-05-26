@@ -1,1 +1,5 @@
-# Este archivo es necesario para que Python reconozca el directorio como un paquete
+# Importar routers
+from . import auth, products, suppliers, categories, sync
+
+# Hacer los routers disponibles para su importación
+__all__ = ['auth', 'products', 'suppliers', 'categories', 'sync']

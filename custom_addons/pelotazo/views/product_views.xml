@@ -6,20 +6,34 @@
         <field name="model">product.template</field>
         <field name="inherit_id" ref="product.product_template_form_view"/>
         <field name="arch" type="xml">
-            <xpath expr="//page[@name='general_information']" position="after">
-                <page string="El Pelotazo" name="pelotazo">
+            <!-- Añadir campos en la pestaña de información general -->
+            <xpath expr="//field[@name='list_price']" position="after">
+                <field name="x_pvp_web" attrs="{'invisible': [('sale_ok', '=', False)]}"/>
+                <field name="x_dto" attrs="{'invisible': [('sale_ok', '=', False)]}"/>
+                <field name="x_precio_margen" attrs="{'readonly': True, 'invisible': [('sale_ok', '=', False)]}"/>
+                <field name="x_beneficio_unitario" attrs="{'readonly': True, 'invisible': [('sale_ok', '=', False)]}"/>
+                <field name="x_beneficio" attrs="{'readonly': True, 'invisible': [('sale_ok', '=', False)]}"/>
+            </xpath>
+            
+            <!-- Añadir pestaña personalizada para El Pelotazo -->
+            <xpath expr="//page[@name='inventory']" position="after">
+                <page string="El Pelotazo" name="pelotazo_info" attrs="{'invisible': [('sale_ok', '=', False)]}">
                     <group>
                         <group string="Información de Venta">
-                            <field name="x_pvp_web"/>
-                            <field name="x_dto"/>
-                            <field name="x_precio_margen"/>
-                            <field name="x_beneficio_unitario"/>
-                            <field name="x_beneficio_total"/>
-                            <field name="x_vendidas"/>
+                            <field name="x_pvp_web" string="PVP Web"/>
+                            <field name="x_dto" string="Descuento (%)"/>
+                            <field name="x_precio_margen" string="Precio con margen" readonly="1"/>
+                            <field name="x_beneficio_unitario" string="Beneficio unitario" readonly="1"/>
+                            <field name="x_beneficio" string="Beneficio (%)" readonly="1"/>
+                            <field name="x_es_oferta" string="En oferta"/>
+                            <field name="x_fecha_fin_oferta" string="Fin de oferta" attrs="{'invisible': [('x_es_oferta', '=', False)]}"/>
                         </group>
                         <group string="Información de Proveedor">
-                            <field name="x_nombre_proveedor"/>
-                            <field name="x_marca"/>
+                            <field name="x_nombre_proveedor" string="Proveedor"/>
+                            <field name="x_marca" string="Marca"/>
+                            <field name="x_codigo_proveedor" string="Código del proveedor"/>
+                            <field name="x_garantia" string="Garantía" placeholder="Ej: 2 años de garantía oficial"/>
+                            <field name="x_stock_disponible" string="Stock disponible" readonly="1"/>
                         </group>
                     </group>
                 </page>
@@ -34,10 +48,13 @@
         <field name="inherit_id" ref="product.product_template_tree_view"/>
         <field name="arch" type="xml">
             <field name="list_price" position="after">
-                <field name="x_pvp_web" optional="show"/>
-                <field name="x_marca" optional="show"/>
-                <field name="x_nombre_proveedor" optional="show"/>
-                <field name="x_beneficio_unitario" optional="show"/>
+                <field name="x_pvp_web" string="PVP Web" optional="show"/>
+                <field name="x_dto" string="Dto. %" optional="show"/>
+                <field name="x_precio_margen" string="Precio Oferta" optional="show"/>
+                <field name="x_beneficio" string="Benef. %" optional="show"/>
+                <field name="x_marca" string="Marca" optional="show"/>
+                <field name="x_nombre_proveedor" string="Proveedor" optional="show"/>
+                <field name="x_stock_disponible" string="Stock Disp." optional="show"/>
             </field>
         </field>
     </record>
@@ -48,14 +65,31 @@
         <field name="model">product.template</field>
         <field name="inherit_id" ref="product.product_template_search_view"/>
         <field name="arch" type="xml">
-            <field name="name" position="after">
-                <field name="x_marca"/>
-                <field name="x_nombre_proveedor"/>
+            <field name="default_code" position="after">
+                <field name="x_marca" string="Marca"/>
+                <field name="x_nombre_proveedor" string="Proveedor"/>
+                <field name="x_codigo_proveedor" string="Cód. Proveedor"/>
             </field>
             <filter name="categ_id" position="after">
                 <filter string="Marca" name="marca" context="{'group_by': 'x_marca'}"/>
                 <filter string="Proveedor" name="proveedor" context="{'group_by': 'x_nombre_proveedor'}"/>
+                <filter string="En oferta" name="en_oferta" domain="[('x_es_oferta', '=', True)]"/>
+                <filter string="Sin stock" name="sin_stock" domain="[('x_stock_disponible', '&lt;=', 0)]"/>
             </filter>
         </field>
     </record>
+
+    <!-- Añadir campos a la vista de formulario de producto en el sitio web -->
+    <template id="product_custom_attributes" inherit_id="website_sale.product_custom_attributes" name="Product Custom Attributes">
+        <xpath expr="//div[hasclass('product-attribute-name')][1]" position="before">
+            <div t-if="product.x_marca" class="product-attribute-name">Marca</div>
+            <div t-if="product.x_marca" class="product-attribute-value" t-field="product.x_marca"/>
+            
+            <div t-if="product.x_nombre_proveedor" class="product-attribute-name">Proveedor</div>
+            <div t-if="product.x_nombre_proveedor" class="product-attribute-value" t-field="product.x_nombre_proveedor"/>
+            
+            <div t-if="product.x_garantia" class="product-attribute-name">Garantía</div>
+            <div t-if="product.x_garantia" class="product-attribute-value" t-field="product.x_garantia"/>
+        </xpath>
+    </template>
 </odoo>

@@ -1,6 +1,6 @@
-from pydantic import Field
+from pydantic import Field, PostgresDsn, validator
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Optional, Dict, Any, Union
 import os
 from dotenv import load_dotenv
 
@@ -25,6 +25,25 @@ class Settings(BaseSettings):
     ODOO_DB: str = os.getenv("ODOO_DB", "odoo_pelotazo")
     ODOO_USERNAME: str = os.getenv("ODOO_USERNAME", "admin")
     ODOO_PASSWORD: str = os.getenv("ODOO_PASSWORD", "admin")
+    
+    # Configuración de la base de datos
+    POSTGRES_SERVER: str = os.getenv("POSTGRES_SERVER", "localhost")
+    POSTGRES_USER: str = os.getenv("POSTGRES_USER", "postgres")
+    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "postgres")
+    POSTGRES_DB: str = os.getenv("POSTGRES_DB", "pelotazo")
+    DATABASE_URI: Optional[PostgresDsn] = None
+    
+    @validator("DATABASE_URI", pre=True)
+    def assemble_db_connection(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
+        if isinstance(v, str):
+            return v
+        return PostgresDsn.build(
+            scheme="postgresql",
+            username=values.get("POSTGRES_USER"),
+            password=values.get("POSTGRES_PASSWORD"),
+            host=values.get("POSTGRES_SERVER"),
+            path=f"/{values.get('POSTGRES_DB') or ''}",
+        )
     
     class Config:
         env_file = ".env"
