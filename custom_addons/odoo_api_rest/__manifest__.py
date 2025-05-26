@@ -1,18 +1,18 @@
 {
     'name': 'Odoo API REST',
     'version': '1.0',
-    'summary': 'API REST para integración con Next.js y React',
+    'summary': 'API REST para Odoo',
     'description': """
-        Este módulo proporciona una API REST para integrar Odoo con aplicaciones frontend
-        desarrolladas con Next.js y React.
+        Módulo que proporciona una API REST para Odoo.
+        Permite la comunicación entre Odoo y aplicaciones externas como Next.js.
     """,
-    'author': 'Tu Nombre',
     'category': 'Technical',
-    'depends': ['base', 'web', 'product', 'sale', 'contacts'],
-    'data': [
-        'views/views.xml',
-    ],
+    'author': 'El Pelotazo',
+    'website': 'https://www.elpelotazo.com',
+    'depends': ['base', 'web'],
+    'data': [],
+    'demo': [],
     'installable': True,
-    'application': True,
+    'application': False,
     'auto_install': False,
 }

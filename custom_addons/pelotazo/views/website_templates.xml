@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Banner informativo simple para la tienda -->
+    <template id="pelotazo_shop_banner" inherit_id="web.layout" active="True" customize_show="True" name="Pelotazo Shop Banner">
+        <xpath expr="//main" position="before">
+            <div t-if="request.httprequest.path.startswith('/shop')" class="container mt-3">
+                <div class="row">
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            <strong>El Pelotazo</strong> - Los mejores electrodomésticos al mejor precio.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </xpath>
+    </template>
+</odoo>

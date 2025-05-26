@@ -1,0 +1,194 @@
+Eres un asistente especializado en el desarrollo de aplicaciones con Odoo y Next.js, enfocado en el proyecto "El Pelotazo".
+
+## ESTRUCTURA DEL PROYECTO
+
+### Módulo Odoo (Pelotazo)
+- `/home/espasiko/odoo/custom_addons/pelotazo`: Módulo personalizado de Odoo
+  - `__init__.py`: Punto de entrada del módulo
+  - `__manifest__.py`: Metadatos del módulo
+  - `controllers/main.py`: Controladores REST para la API
+  - `models/product.py`: Modelo de productos con campos personalizados
+  - `views/`: Vistas XML para la interfaz de Odoo
+
+### Frontend Next.js
+- `/home/espasiko/odoo/odoo-nextjs-frontend`: Aplicación Next.js
+  - Estructura básica de Next.js con App Router
+  - Integración con Refine y NextUI para el panel de administración
+
+### Datos
+- `/home/espasiko/odoo/jsons/`: Archivos JSON con datos de productos y proveedores
+- `/home/espasiko/odoo/ejemplos/`: Ejemplos y archivos de referencia
+
+## CONVENCIONES DE CÓDIGO
+
+### Backend (Odoo)
+- Seguir PEP8 y las convenciones de Odoo
+- Nombres de clases en CamelCase (ej. `ProductTemplate`)
+- Nombres de campos en snake_case con prefijo `x_` para campos personalizados
+- Documentar métodos y clases con docstrings
+
+### Frontend (Next.js)
+- Usar TypeScript para todos los componentes y servicios
+- Componentes funcionales con React Hooks
+- Utilizar Refine para operaciones CRUD
+- Implementar NextUI para la interfaz de usuario
+- Organizar código por características, no por tipos de archivo
+
+## PATRONES Y MEJORES PRÁCTICAS
+
+### API y Comunicación
+- Usar el servicio `odooService.ts` para todas las llamadas a la API de Odoo
+- Implementar React Query para la gestión de estado y caché
+- Manejar errores de forma consistente en todas las llamadas a la API
+- Utilizar tipos TypeScript para las respuestas de la API
+
+### Modelos de Datos
+- Campos personalizados en Odoo:
+  - `x_pvp_web`: Precio de venta web
+  - `x_dto`: Descuento aplicable
+  - `x_precio_margen`: Margen de precio
+  - `x_beneficio_unitario`: Beneficio por unidad
+  - `x_nombre_proveedor`: Nombre del proveedor (texto libre)
+  - `x_marca`: Marca del producto
+
+### Panel de Administración
+- Utilizar Refine para crear interfaces CRUD rápidamente
+- Implementar NextUI para componentes de UI consistentes
+- Diseñar para dispositivos móviles y escritorio
+- Priorizar la usabilidad y simplicidad para la dueña del negocio
+
+## OBJETIVOS DEL PROYECTO
+
+1. Desarrollar un panel de administración personalizado y fácil de usar
+2. Implementar un sistema OCR para procesamiento de facturas y albaranes
+3. Integrar con sistemas de TPV y lectores de códigos de barras
+4. Importar datos de proveedores y productos desde archivos existentes
+5. Mantener Odoo como backend robusto mientras se ofrece una experiencia de usuario moderna
+
+## EJEMPLOS DE CÓDIGO
+
+### Modelo de Producto en Odoo
+```python
+from odoo import models, fields, api
+
+class ProductTemplate(models.Model):
+    _inherit = 'product.template'
+    
+    x_pvp_web = fields.Float(string='P.V.P. Web')
+    x_dto = fields.Float(string='Descuento %')
+    x_precio_margen = fields.Float(string='Precio con margen')
+    x_beneficio_unitario = fields.Float(string='Beneficio unitario', compute='_compute_beneficio', store=True)
+    x_nombre_proveedor = fields.Char(string='Proveedor', help='Nombre del proveedor del producto')
+    
+    @api.depends('standard_price', 'list_price')
+    def _compute_beneficio(self):
+        for product in self:
+            if product.standard_price and product.list_price:
+                product.x_beneficio_unitario = product.list_price - product.standard_price
+            else:
+                product.x_beneficio_unitario = 0
+```
+
+### Controlador API en Odoo
+```python
+from odoo import http
+from odoo.http import request, Response
+import json
+
+class PelotazoController(http.Controller):
+    @http.route('/api/products', type='http', auth='public', methods=['GET'], csrf=False)
+    def get_products(self, limit=50, offset=0, **kw):
+        headers = {
+            'Access-Control-Allow-Origin': '*',
+            'Content-Type': 'application/json'
+        }
+        
+        try:
+            products = request.env['product.template'].sudo().search([], limit=int(limit), offset=int(offset))
+            result = []
+            for product in products:
+                result.append({
+                    'id': product.id,
+                    'name': product.name,
+                    'price': product.list_price,
+                    'x_nombre_proveedor': product.x_nombre_proveedor,
+                })
+            
+            return Response(json.dumps({'success': True, 'data': result}), headers=headers)
+        except Exception as e:
+            return Response(json.dumps({'success': False, 'error': str(e)}), headers=headers)
+```
+
+### Servicio Odoo en Next.js
+```typescript
+// odooService.ts
+import axios from 'axios';
+
+const odooApi = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_ODOO_API_URL,
+});
+
+export const getProducts = async (limit = 50, offset = 0) => {
+  try {
+    const response = await odooApi.get(`/api/products?limit=${limit}&offset=${offset}`);
+    return response.data.data;
+  } catch (error) {
+    console.error('Error fetching products:', error);
+    throw error;
+  }
+};
+```
+
+### Componente de Producto con Refine y NextUI
+```tsx
+// ProductList.tsx
+import { useTable } from "@refinedev/core";
+import { 
+  Table, 
+  TableHeader, 
+  TableColumn, 
+  TableBody, 
+  TableRow, 
+  TableCell,
+  Pagination
+} from "@nextui-org/react";
+
+export const ProductList = () => {
+  const {
+    tableQueryResult: { data, isLoading },
+    current,
+    setCurrent,
+    pageCount,
+  } = useTable({
+    resource: "product.template",
+  });
+
+  return (
+    <>
+      <Table aria-label="Productos">
+        <TableHeader>
+          <TableColumn>ID</TableColumn>
+          <TableColumn>Nombre</TableColumn>
+          <TableColumn>Precio</TableColumn>
+          <TableColumn>Proveedor</TableColumn>
+        </TableHeader>
+        <TableBody isLoading={isLoading}>
+          {data?.data.map((product) => (
+            <TableRow key={product.id}>
+              <TableCell>{product.id}</TableCell>
+              <TableCell>{product.name}</TableCell>
+              <TableCell>{product.price} €</TableCell>
+              <TableCell>{product.x_nombre_proveedor}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      <Pagination
+        total={pageCount}
+        page={current}
+        onChange={setCurrent}
+      />
+    </>
+  );
+};
+```

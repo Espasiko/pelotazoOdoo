@@ -1,85 +1,74 @@
-# Integración de Odoo con Next.js y React
+# El Pelotazo - Sistema de Tienda Online y Gestión
 
-Este proyecto demuestra cómo integrar Odoo como backend con Next.js y React como frontend para crear aplicaciones web modernas y personalizadas.
+Este proyecto implementa una solución completa para la tienda "El Pelotazo", incluyendo una tienda online y un panel de administración (CRM/ERP).
+
+## Características
+
+### Tienda Online
+- Catálogo de productos con filtros por marca, precio y categoría
+- Sistema de reserva con pago del 30% inicial
+- Cálculo automático de costes de envío (gratis hasta 15km de Roquetas de Mar)
+- Integración con financiación Santander y Pepper
+
+### Panel de Administración
+- Gestión completa de productos, categorías y marcas
+- Optimización SEO de productos
+- Gestión de pedidos y reservas
+- Facturación manual y electrónica
+- Integración con lectores de códigos de barras
+- Sistema de backup automático diario
+- Herramienta de migración desde Excel
 
 ## Estructura del Proyecto
 
-- `/odoo`: Repositorio oficial de Odoo (versión 18.0)
-- `/odoo-nextjs-frontend`: Aplicación Next.js que se conecta a Odoo mediante su API
-
-## Requisitos
-
-- Node.js 18+ y npm
-- Python 3.8+
-- PostgreSQL
-
-## Configuración de Odoo
-
-1. Instalar las dependencias de Odoo:
-
-```bash
-cd /home/espasiko/odoo/odoo
-pip install -r requirements.txt
+```
+/
+│── frontend/           # Aplicación React con Refine
+│   │── admin/          # Panel de administración
+│   └── tienda/         # Tienda online
+│── backend/            # Backend con PocketBase
+│   │── pb_data/        # Datos de PocketBase
+│   │── pb_migrations/  # Migraciones de PocketBase
+│   └── importacion/    # Sistema de importación de datos
+│       │── core/        # Lógica principal de importación
+│       │── db/          # Interacción con PocketBase
+│       │── parsers/     # Parsers para diferentes proveedores
+│       └── scripts/     # Scripts de actualización
+└── docs/              # Documentación
 ```
 
-2. Configurar la base de datos PostgreSQL para Odoo.
+## Tecnologías
 
-3. Iniciar el servidor de Odoo:
+- **Frontend**: React, Vite, Refine, Material-UI
+- **Backend**: PocketBase (Go)
+- **Base de datos**: SQLite (integrada en PocketBase)
 
-```bash
-cd /home/espasiko/odoo/odoo
-python odoo-bin --addons-path=addons -d odoo -i base --db_host=localhost --db_port=5432 --db_user=odoo --db_password=odoo
-```
+## Instalación y Configuración
 
-## Configuración del Frontend Next.js
+1. Clonar el repositorio
+2. Instalar dependencias del frontend: `cd frontend && npm install`
+3. Iniciar el servidor de desarrollo: `npm run dev`
+4. Iniciar PocketBase: `cd backend && ./pocketbase serve`
 
-1. Instalar las dependencias:
+## Migración e Importación de Datos
 
-```bash
-cd /home/espasiko/odoo/odoo-nextjs-frontend
-npm install
-```
+El sistema incluye una herramienta de migración para importar datos desde los archivos Excel existentes. Acceda a esta funcionalidad desde el panel de administración en la sección "Migración".
 
-2. Configurar las variables de entorno en `.env.local`:
+### Sistema de Importación
 
-```
-NEXT_PUBLIC_ODOO_API_URL=http://localhost:8069
-NEXT_PUBLIC_ODOO_DB=odoo
-NEXT_PUBLIC_ODOO_USERNAME=admin
-NEXT_PUBLIC_ODOO_PASSWORD=admin
-```
+El sistema de importación ha sido refactorizado con una arquitectura modular para mejorar su mantenibilidad:
 
-3. Iniciar el servidor de desarrollo:
+- **Core**: Contiene la lógica principal de importación, procesamiento de archivos e importación a la base de datos.
+- **DB**: Módulos para interactuar con PocketBase, gestionando proveedores, productos, categorías e importaciones.
+- **Parsers**: Parsers específicos para diferentes proveedores, con un parser genérico universal para formatos no estandarizados.
+- **Scripts**: Scripts de actualización y mantenimiento del sistema.
 
-```bash
-npm run dev
-```
+Para importar datos, puede usar el servidor de importación que se ejecuta en el puerto 3100 o utilizar directamente las funciones del módulo `core`.
 
-4. Abrir [http://localhost:3000](http://localhost:3000) en el navegador.
+## Backup Automático
 
-## Características de la Integración
+El sistema realiza backups automáticos diarios a las 21:00h. Los backups se almacenan en la carpeta `/backend/backups/`.
 
-- **Autenticación**: Conexión segura con el backend de Odoo
-- **Gestión de Datos**: Uso de React Query para manejar el estado y las consultas
-- **Operaciones CRUD**: Crear, leer, actualizar y eliminar registros en Odoo
-- **UI Moderna**: Interfaz de usuario moderna y responsiva con Tailwind CSS
+## Licencia
 
-## Estructura del Frontend
-
-- `/src/services`: Servicios para conectarse a la API de Odoo
-- `/src/hooks`: Hooks personalizados para interactuar con Odoo
-- `/app/products`: Página de ejemplo para gestionar productos
-
-## Desarrollo de Módulos Personalizados
-
-Para desarrollar módulos personalizados de Odoo:
-
-1. Crear un directorio para el módulo en `/home/espasiko/odoo/odoo/addons/custom_modules/`
-2. Seguir la estructura estándar de módulos de Odoo
-3. Incluir los controladores necesarios para exponer las APIs que utilizará el frontend
-
-## Recursos Adicionales
-
-- [Documentación de Odoo](https://www.odoo.com/documentation/18.0/)
-- [Documentación de Next.js](https://nextjs.org/docs)
-- [Documentación de React Query](https://tanstack.com/query/latest/docs/react/overview)
+Propiedad de El Pelotazo. Todos los derechos reservados.

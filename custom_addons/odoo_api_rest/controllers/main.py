@@ -1,223 +1,169 @@
+# -*- coding: utf-8 -*-
 from odoo import http
 from odoo.http import request, Response
 import json
 
-def cors_response(data, status=200):
-    """Helper function to create responses with CORS headers"""
-    response = Response(json.dumps(data), status=status)
-    response.headers['Content-Type'] = 'application/json'
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-    response.headers['Access-Control-Allow-Headers'] = 'Origin, X-Requested-With, Content-Type, Accept, Authorization'
-    return response
-
-class ApiController(http.Controller):
-    @http.route('/api/auth', type='http', auth='none', methods=['POST', 'OPTIONS'], cors='*', csrf=False)
+class OdooApiRestController(http.Controller):
+    # Método para manejar las solicitudes OPTIONS (preflight CORS)
+    @http.route(['/api/v1/*'], type='http', auth='none', methods=['OPTIONS'], csrf=False)
+    def handle_options_request(self, **kw):
+        headers = {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, api-key, db, login, password',
+            'Access-Control-Max-Age': '86400',  # 24 horas
+        }
+        return Response(status=204, headers=headers)
+    
+    # Endpoint para autenticación
+    @http.route('/api/v1/auth', type='json', auth='none', methods=['POST'], csrf=False)
     def authenticate(self, **kw):
-        """
-        Endpoint para autenticar usuarios y obtener un token de sesión
-        """
-        # Manejar solicitudes OPTIONS para CORS preflight
-        if request.httprequest.method == 'OPTIONS':
-            return cors_response({'success': True})
-            
+        headers = {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        }
+        
         try:
-            # Obtener datos de la solicitud
-            data = json.loads(request.httprequest.data.decode('utf-8')) if request.httprequest.data else {}
-            db = data.get('db') or kw.get('db')
-            login = data.get('login') or kw.get('login')
-            password = data.get('password') or kw.get('password')
+            # Obtener credenciales del cuerpo de la solicitud
+            db = request.jsonrequest.get('db')
+            login = request.jsonrequest.get('login')
+            password = request.jsonrequest.get('password')
             
-            if not all([db, login, password]):
-                return cors_response({'success': False, 'error': 'Faltan credenciales'}, 400)
-            
+            # Validar credenciales
             uid = request.session.authenticate(db, login, password)
+            
             if uid:
-                return cors_response({
+                # Obtener información del usuario
+                user = request.env['res.users'].sudo().browse(uid)
+                
+                return {
                     'success': True,
                     'uid': uid,
+                    'name': user.name,
+                    'email': user.email,
                     'session_id': request.session.sid,
-                    'name': request.env['res.users'].browse(uid).name,
-                })
-            return cors_response({'success': False, 'error': 'Credenciales inválidas'}, 401)
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': 'Credenciales inválidas',
+                }
         except Exception as e:
-            return cors_response({'success': False, 'error': str(e)}, 500)
-
-    @http.route('/api/products', type='http', auth='public', methods=['GET', 'OPTIONS'], cors='*')
-    def get_products(self, **kw):
-        """
-        Endpoint para obtener productos
-        """
-        # Manejar solicitudes OPTIONS para CORS preflight
-        if request.httprequest.method == 'OPTIONS':
-            return cors_response({'success': True})
-            
-        try:
-            limit = int(kw.get('limit', 50))
-            offset = int(kw.get('offset', 0))
-            
-            domain = []
-            if 'category' in kw:
-                domain.append(('categ_id.name', '=', kw.get('category')))
-            
-            fields = ['id', 'name', 'list_price', 'default_code', 'description', 'image_1920']
-            products = request.env['product.template'].sudo().search_read(domain, fields=fields, limit=limit, offset=offset)
-            
-            # Convertir la imagen a URL o base64 si es necesario
-            for product in products:
-                if product.get('image_1920'):
-                    product['image_url'] = f"/web/image/product.template/{product['id']}/image_1920"
-                    del product['image_1920']
-            
-            return cors_response({'success': True, 'data': products})
-        except Exception as e:
-            return cors_response({'success': False, 'error': str(e)}, 500)
-
-    @http.route('/api/products', type='json', auth='user', methods=['POST'], cors='*')
-    def create_product(self, **kw):
-        """
-        Endpoint para crear un nuevo producto
-        """
-        try:
-            product_data = request.jsonrequest
-            required_fields = ['name', 'list_price']
-            
-            for field in required_fields:
-                if field not in product_data:
-                    return {'success': False, 'error': f'El campo {field} es obligatorio'}
-            
-            product_id = request.env['product.template'].sudo().create(product_data)
-            
             return {
-                'success': True,
-                'id': product_id.id,
-                'message': 'Producto creado correctamente'
+                'success': False,
+                'error': str(e),
             }
-        except Exception as e:
-            return {'success': False, 'error': str(e)}
-
-    @http.route('/api/products/<int:product_id>', type='http', auth='public', methods=['GET'], cors='*')
-    def get_product(self, product_id, **kw):
-        """
-        Endpoint para obtener un producto específico
-        """
+    
+    # Endpoint para obtener productos
+    @http.route('/api/v1/products', type='http', auth='public', methods=['GET'], csrf=False)
+    def get_products(self, limit=50, offset=0, **kw):
+        headers = {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+            'Content-Type': 'application/json',
+        }
+        
         try:
-            fields = ['id', 'name', 'list_price', 'default_code', 'description', 'image_1920']
-            product = request.env['product.template'].sudo().browse(product_id).read(fields)
+            # Obtener productos
+            products = request.env['product.template'].sudo().search([], limit=int(limit), offset=int(offset))
+            total = request.env['product.template'].sudo().search_count([])
             
-            if not product:
-                return http.Response(
-                    json.dumps({'success': False, 'error': 'Producto no encontrado'}),
+            result = []
+            for product in products:
+                result.append({
+                    'id': product.id,
+                    'name': product.name,
+                    'price': product.list_price,
+                    'description': product.description_sale or '',
+                    'image_url': f'/web/image/product.template/{product.id}/image_1920',
+                    'category_id': product.categ_id.id,
+                    'category_name': product.categ_id.name,
+                    'x_pvp_web': product.x_pvp_web if hasattr(product, 'x_pvp_web') else 0,
+                    'x_dto': product.x_dto if hasattr(product, 'x_dto') else 0,
+                    'x_precio_margen': product.x_precio_margen if hasattr(product, 'x_precio_margen') else 0,
+                    'x_beneficio_unitario': product.x_beneficio_unitario if hasattr(product, 'x_beneficio_unitario') else 0,
+                    'x_nombre_proveedor': product.x_nombre_proveedor if hasattr(product, 'x_nombre_proveedor') else '',
+                    'x_marca': product.x_marca if hasattr(product, 'x_marca') else '',
+                })
+            
+            return Response(
+                json.dumps({
+                    'success': True,
+                    'data': result,
+                    'total': total,
+                }),
+                headers=headers,
+                content_type='application/json'
+            )
+        except Exception as e:
+            return Response(
+                json.dumps({
+                    'success': False,
+                    'error': str(e),
+                }),
+                headers=headers,
+                status=500,
+                content_type='application/json'
+            )
+    
+    # Endpoint para obtener un producto específico
+    @http.route('/api/v1/products/<int:id>', type='http', auth='public', methods=['GET'], csrf=False)
+    def get_product(self, id, **kw):
+        headers = {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+            'Content-Type': 'application/json',
+        }
+        
+        try:
+            # Obtener producto
+            product = request.env['product.template'].sudo().browse(int(id))
+            
+            if not product.exists():
+                return Response(
+                    json.dumps({
+                        'success': False,
+                        'error': 'Producto no encontrado',
+                    }),
+                    headers=headers,
                     status=404,
                     content_type='application/json'
                 )
             
-            # Convertir la imagen a URL
-            if product[0].get('image_1920'):
-                product[0]['image_url'] = f"/web/image/product.template/{product_id}/image_1920"
-                del product[0]['image_1920']
-            
-            return http.Response(
-                json.dumps({'success': True, 'data': product[0]}),
-                status=200,
-                content_type='application/json'
-            )
-        except Exception as e:
-            return http.Response(
-                json.dumps({'success': False, 'error': str(e)}),
-                status=500,
-                content_type='application/json'
-            )
-
-    @http.route('/api/products/<int:product_id>', type='json', auth='user', methods=['PUT'], cors='*')
-    def update_product(self, product_id, **kw):
-        """
-        Endpoint para actualizar un producto existente
-        """
-        try:
-            product = request.env['product.template'].sudo().browse(product_id)
-            if not product.exists():
-                return {'success': False, 'error': 'Producto no encontrado'}
-            
-            product_data = request.jsonrequest
-            product.write(product_data)
-            
-            return {
-                'success': True,
-                'message': 'Producto actualizado correctamente'
+            result = {
+                'id': product.id,
+                'name': product.name,
+                'price': product.list_price,
+                'description': product.description_sale or '',
+                'image_url': f'/web/image/product.template/{product.id}/image_1920',
+                'category_id': product.categ_id.id,
+                'category_name': product.categ_id.name,
+                'x_pvp_web': product.x_pvp_web if hasattr(product, 'x_pvp_web') else 0,
+                'x_dto': product.x_dto if hasattr(product, 'x_dto') else 0,
+                'x_precio_margen': product.x_precio_margen if hasattr(product, 'x_precio_margen') else 0,
+                'x_beneficio_unitario': product.x_beneficio_unitario if hasattr(product, 'x_beneficio_unitario') else 0,
+                'x_nombre_proveedor': product.x_nombre_proveedor if hasattr(product, 'x_nombre_proveedor') else '',
+                'x_marca': product.x_marca if hasattr(product, 'x_marca') else '',
             }
-        except Exception as e:
-            return {'success': False, 'error': str(e)}
-
-    @http.route('/api/products/<int:product_id>', type='json', auth='user', methods=['DELETE'], cors='*')
-    def delete_product(self, product_id, **kw):
-        """
-        Endpoint para eliminar un producto existente
-        """
-        try:
-            product = request.env['product.template'].sudo().browse(product_id)
-            if not product.exists():
-                return {'success': False, 'error': 'Producto no encontrado'}
             
-            product.unlink()
-            
-            return {
-                'success': True,
-                'message': 'Producto eliminado correctamente'
-            }
-        except Exception as e:
-            return {'success': False, 'error': str(e)}
-
-    # Endpoints para clientes (partners)
-    @http.route('/api/partners', type='http', auth='public', methods=['GET'], cors='*')
-    def get_partners(self, **kw):
-        """
-        Endpoint para obtener clientes/partners
-        """
-        try:
-            limit = int(kw.get('limit', 50))
-            offset = int(kw.get('offset', 0))
-            
-            domain = [('customer_rank', '>', 0)]  # Solo clientes
-            
-            fields = ['id', 'name', 'email', 'phone', 'street', 'city', 'country_id']
-            partners = request.env['res.partner'].sudo().search_read(domain, fields=fields, limit=limit, offset=offset)
-            
-            return http.Response(
-                json.dumps({'success': True, 'data': partners}),
-                status=200,
+            return Response(
+                json.dumps({
+                    'success': True,
+                    'data': result,
+                }),
+                headers=headers,
                 content_type='application/json'
             )
         except Exception as e:
-            return http.Response(
-                json.dumps({'success': False, 'error': str(e)}),
-                status=500,
-                content_type='application/json'
-            )
-
-    # Endpoints para órdenes de venta
-    @http.route('/api/orders', type='http', auth='public', methods=['GET'], cors='*')
-    def get_orders(self, **kw):
-        """
-        Endpoint para obtener órdenes de venta
-        """
-        try:
-            limit = int(kw.get('limit', 50))
-            offset = int(kw.get('offset', 0))
-            
-            domain = []
-            
-            fields = ['id', 'name', 'partner_id', 'date_order', 'amount_total', 'state']
-            orders = request.env['sale.order'].sudo().search_read(domain, fields=fields, limit=limit, offset=offset)
-            
-            return http.Response(
-                json.dumps({'success': True, 'data': orders}),
-                status=200,
-                content_type='application/json'
-            )
-        except Exception as e:
-            return http.Response(
-                json.dumps({'success': False, 'error': str(e)}),
+            return Response(
+                json.dumps({
+                    'success': False,
+                    'error': str(e),
+                }),
+                headers=headers,
                 status=500,
                 content_type='application/json'
             )
